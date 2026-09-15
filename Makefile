@@ -81,7 +81,7 @@ down:
 
 build:
 	@echo "Building application..."
-	go build -o bin/svgstat cmd/api/main.go
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o bin/svgstat cmd/api/main.go
 
 test:
 	@echo "Running tests..."
