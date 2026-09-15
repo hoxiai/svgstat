@@ -35,10 +35,9 @@ Analytics is not responsible for:
 
 # 2. System Context
 
-SVGStat sits behind APayShop and Shoply in the broader SaaS architecture:
+SVGStat sits behind APay in the broader SaaS architecture:
 
-* `APayShop` handles public website entry, pricing, and user portal flows.
-* `Shoply` owns tenant, billing, project lifecycle, and management workflows.
+* `APay` handles public website entry, pricing, and user portal flows.
 * `SVGStat` observes runtime SVG traffic and turns it into analytics.
 
 Therefore analytics data in SVGStat should describe:
@@ -273,8 +272,7 @@ Never persist one database row per runtime request.
 
 Dashboard consumers may include:
 
-* Shoply management surfaces
-* APayShop user center views
+* APay user center views
 * future public dashboard pages
 
 Dashboard reads may combine:
@@ -317,7 +315,7 @@ Rules:
 * avoid raw full referrer URLs when host-level data is enough
 * avoid embedding secrets or user tokens into analytics payloads
 
-Business identity belongs to upstream systems such as Shoply or APayShop, not to SVGStat runtime analytics.
+Business identity belongs to APay, not to SVGStat runtime analytics.
 
 ---
 

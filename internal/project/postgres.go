@@ -22,7 +22,8 @@ func (r *PostgresRepository) GetByID(ctx context.Context, id string) (*Project, 
 	query := `
 		SELECT id, user_id, external_project_id, tenant_id, slug, name, description, status, visibility,
 			public_token_hash, default_theme, default_locale, render_enabled, badge_enabled,
-			widget_enabled, chart_enabled, last_synced_at, deleted_at, created_at, updated_at
+			widget_enabled, chart_enabled, website_tracking_enabled, website_domains,
+			last_synced_at, deleted_at, created_at, updated_at
 		FROM projects
 		WHERE id = $1 AND deleted_at IS NULL
 	`
@@ -32,6 +33,7 @@ func (r *PostgresRepository) GetByID(ctx context.Context, id string) (*Project, 
 		&p.ID, &p.UserID, &p.ExternalProjectID, &p.TenantID, &p.Slug, &p.Name, &p.Description,
 		&p.Status, &p.Visibility, &p.PublicTokenHash, &p.DefaultTheme, &p.DefaultLocale,
 		&p.RenderEnabled, &p.BadgeEnabled, &p.WidgetEnabled, &p.ChartEnabled,
+		&p.WebsiteTrackingEnabled, &p.WebsiteDomains,
 		&p.LastSyncedAt, &p.DeletedAt, &p.CreatedAt, &p.UpdatedAt,
 	)
 
@@ -49,7 +51,8 @@ func (r *PostgresRepository) GetByIDAndUser(ctx context.Context, id, userID stri
 	query := `
 		SELECT id, user_id, external_project_id, tenant_id, slug, name, description, status, visibility,
 			public_token_hash, default_theme, default_locale, render_enabled, badge_enabled,
-			widget_enabled, chart_enabled, last_synced_at, deleted_at, created_at, updated_at
+			widget_enabled, chart_enabled, website_tracking_enabled, website_domains,
+			last_synced_at, deleted_at, created_at, updated_at
 		FROM projects
 		WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
 	`
@@ -59,6 +62,7 @@ func (r *PostgresRepository) GetByIDAndUser(ctx context.Context, id, userID stri
 		&p.ID, &p.UserID, &p.ExternalProjectID, &p.TenantID, &p.Slug, &p.Name, &p.Description,
 		&p.Status, &p.Visibility, &p.PublicTokenHash, &p.DefaultTheme, &p.DefaultLocale,
 		&p.RenderEnabled, &p.BadgeEnabled, &p.WidgetEnabled, &p.ChartEnabled,
+		&p.WebsiteTrackingEnabled, &p.WebsiteDomains,
 		&p.LastSyncedAt, &p.DeletedAt, &p.CreatedAt, &p.UpdatedAt,
 	)
 
@@ -76,7 +80,8 @@ func (r *PostgresRepository) ListByUser(ctx context.Context, userID string) ([]*
 	query := `
 		SELECT id, user_id, external_project_id, tenant_id, slug, name, description, status, visibility,
 			public_token_hash, default_theme, default_locale, render_enabled, badge_enabled,
-			widget_enabled, chart_enabled, last_synced_at, deleted_at, created_at, updated_at
+			widget_enabled, chart_enabled, website_tracking_enabled, website_domains,
+			last_synced_at, deleted_at, created_at, updated_at
 		FROM projects
 		WHERE user_id = $1 AND deleted_at IS NULL
 		ORDER BY created_at DESC
@@ -95,6 +100,43 @@ func (r *PostgresRepository) ListByUser(ctx context.Context, userID string) ([]*
 			&p.ID, &p.UserID, &p.ExternalProjectID, &p.TenantID, &p.Slug, &p.Name, &p.Description,
 			&p.Status, &p.Visibility, &p.PublicTokenHash, &p.DefaultTheme, &p.DefaultLocale,
 			&p.RenderEnabled, &p.BadgeEnabled, &p.WidgetEnabled, &p.ChartEnabled,
+			&p.WebsiteTrackingEnabled, &p.WebsiteDomains,
+			&p.LastSyncedAt, &p.DeletedAt, &p.CreatedAt, &p.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan project: %w", err)
+		}
+		projects = append(projects, &p)
+	}
+
+	return projects, rows.Err()
+}
+
+func (r *PostgresRepository) ListAll(ctx context.Context) ([]*Project, error) {
+	query := `
+		SELECT id, user_id, external_project_id, tenant_id, slug, name, description, status, visibility,
+			public_token_hash, default_theme, default_locale, render_enabled, badge_enabled,
+			widget_enabled, chart_enabled, website_tracking_enabled, website_domains,
+			last_synced_at, deleted_at, created_at, updated_at
+		FROM projects
+		WHERE deleted_at IS NULL
+		ORDER BY created_at ASC
+	`
+
+	rows, err := r.pool.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list projects: %w", err)
+	}
+	defer rows.Close()
+
+	var projects []*Project
+	for rows.Next() {
+		var p Project
+		err := rows.Scan(
+			&p.ID, &p.UserID, &p.ExternalProjectID, &p.TenantID, &p.Slug, &p.Name, &p.Description,
+			&p.Status, &p.Visibility, &p.PublicTokenHash, &p.DefaultTheme, &p.DefaultLocale,
+			&p.RenderEnabled, &p.BadgeEnabled, &p.WidgetEnabled, &p.ChartEnabled,
+			&p.WebsiteTrackingEnabled, &p.WebsiteDomains,
 			&p.LastSyncedAt, &p.DeletedAt, &p.CreatedAt, &p.UpdatedAt,
 		)
 		if err != nil {
@@ -110,7 +152,8 @@ func (r *PostgresRepository) GetBySlug(ctx context.Context, slug string) (*Proje
 	query := `
 		SELECT id, user_id, external_project_id, tenant_id, slug, name, description, status, visibility,
 			public_token_hash, default_theme, default_locale, render_enabled, badge_enabled,
-			widget_enabled, chart_enabled, last_synced_at, deleted_at, created_at, updated_at
+			widget_enabled, chart_enabled, website_tracking_enabled, website_domains,
+			last_synced_at, deleted_at, created_at, updated_at
 		FROM projects
 		WHERE slug = $1 AND deleted_at IS NULL
 	`
@@ -120,6 +163,7 @@ func (r *PostgresRepository) GetBySlug(ctx context.Context, slug string) (*Proje
 		&p.ID, &p.UserID, &p.ExternalProjectID, &p.TenantID, &p.Slug, &p.Name, &p.Description,
 		&p.Status, &p.Visibility, &p.PublicTokenHash, &p.DefaultTheme, &p.DefaultLocale,
 		&p.RenderEnabled, &p.BadgeEnabled, &p.WidgetEnabled, &p.ChartEnabled,
+		&p.WebsiteTrackingEnabled, &p.WebsiteDomains,
 		&p.LastSyncedAt, &p.DeletedAt, &p.CreatedAt, &p.UpdatedAt,
 	)
 
@@ -137,7 +181,8 @@ func (r *PostgresRepository) GetByExternalID(ctx context.Context, externalID str
 	query := `
 		SELECT id, user_id, external_project_id, tenant_id, slug, name, description, status, visibility,
 			public_token_hash, default_theme, default_locale, render_enabled, badge_enabled,
-			widget_enabled, chart_enabled, last_synced_at, deleted_at, created_at, updated_at
+			widget_enabled, chart_enabled, website_tracking_enabled, website_domains,
+			last_synced_at, deleted_at, created_at, updated_at
 		FROM projects
 		WHERE external_project_id = $1 AND deleted_at IS NULL
 	`
@@ -147,6 +192,7 @@ func (r *PostgresRepository) GetByExternalID(ctx context.Context, externalID str
 		&p.ID, &p.UserID, &p.ExternalProjectID, &p.TenantID, &p.Slug, &p.Name, &p.Description,
 		&p.Status, &p.Visibility, &p.PublicTokenHash, &p.DefaultTheme, &p.DefaultLocale,
 		&p.RenderEnabled, &p.BadgeEnabled, &p.WidgetEnabled, &p.ChartEnabled,
+		&p.WebsiteTrackingEnabled, &p.WebsiteDomains,
 		&p.LastSyncedAt, &p.DeletedAt, &p.CreatedAt, &p.UpdatedAt,
 	)
 
@@ -173,7 +219,8 @@ func (r *PostgresRepository) Create(ctx context.Context, project *Project) error
 		project.ID, project.UserID, project.ExternalProjectID, project.TenantID, project.Slug, project.Name,
 		project.Description, project.Status, project.Visibility, project.PublicTokenHash,
 		project.DefaultTheme, project.DefaultLocale, project.RenderEnabled, project.BadgeEnabled,
-		project.WidgetEnabled, project.ChartEnabled, project.LastSyncedAt,
+		project.WidgetEnabled, project.ChartEnabled, project.WebsiteTrackingEnabled,
+		project.WebsiteDomains, project.LastSyncedAt,
 	)
 
 	if err != nil {
@@ -189,7 +236,8 @@ func (r *PostgresRepository) Update(ctx context.Context, project *Project) error
 		SET user_id = $2, external_project_id = $3, tenant_id = $4, slug = $5, name = $6, description = $7,
 			status = $8, visibility = $9, public_token_hash = $10, default_theme = $11,
 			default_locale = $12, render_enabled = $13, badge_enabled = $14, widget_enabled = $15,
-			chart_enabled = $16, last_synced_at = $17, deleted_at = $18, updated_at = NOW()
+			chart_enabled = $16, website_tracking_enabled = $17, website_domains = $18,
+			last_synced_at = $19, deleted_at = $20, updated_at = NOW()
 		WHERE id = $1
 	`
 
@@ -197,7 +245,8 @@ func (r *PostgresRepository) Update(ctx context.Context, project *Project) error
 		project.ID, project.UserID, project.ExternalProjectID, project.TenantID, project.Slug, project.Name,
 		project.Description, project.Status, project.Visibility, project.PublicTokenHash,
 		project.DefaultTheme, project.DefaultLocale, project.RenderEnabled, project.BadgeEnabled,
-		project.WidgetEnabled, project.ChartEnabled, project.LastSyncedAt, project.DeletedAt,
+		project.WidgetEnabled, project.ChartEnabled, project.WebsiteTrackingEnabled,
+		project.WebsiteDomains, project.LastSyncedAt, project.DeletedAt,
 	)
 
 	if err != nil {
@@ -228,7 +277,7 @@ func (r *PostgresRepository) Upsert(ctx context.Context, project *Project) error
 			id, user_id, external_project_id, tenant_id, slug, name, description, status, visibility,
 			public_token_hash, default_theme, default_locale, render_enabled, badge_enabled,
 			widget_enabled, chart_enabled, last_synced_at, created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW(), NOW())
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW(), NOW())
 		ON CONFLICT (id) DO UPDATE SET
 			user_id = EXCLUDED.user_id,
 			external_project_id = EXCLUDED.external_project_id,

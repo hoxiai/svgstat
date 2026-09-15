@@ -233,7 +233,7 @@ DO UPDATE SET
 The following rules are mandatory:
 
 1. Draft SQL follows `SCHEMA.md`.
-2. No table duplicates upstream billing or account truth.
+2. No table duplicates APay billing or account truth.
 3. Keys and statuses use explicit constraints where practical.
 4. Historical analytics remain aggregated.
 5. Sync events preserve auditability and idempotency.

@@ -1,30 +1,192 @@
 package api
 
 import (
+	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
+	"net/url"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/rs/zerolog/log"
 )
+
+type rateLimitEntry struct {
+	count       int
+	windowStart time.Time
+}
+
+type rateLimiter struct {
+	mu          sync.Mutex
+	entries     map[string]rateLimitEntry
+	limit       int
+	window      time.Duration
+	lastCleanup time.Time
+	backend     distributedRateLimiter
+	prefix      string
+}
+
+type distributedRateLimiter interface {
+	AllowRate(context.Context, string, int, time.Duration) (bool, time.Duration, error)
+}
+
+func newRateLimiter(limit int, window time.Duration, prefix string, backend distributedRateLimiter) *rateLimiter {
+	return &rateLimiter{entries: make(map[string]rateLimitEntry), limit: limit, window: window, prefix: prefix, backend: backend}
+}
+
+func (l *rateLimiter) allow(ctx context.Context, key string, now time.Time) bool {
+	if l.backend != nil {
+		allowed, _, err := l.backend.AllowRate(ctx, rateLimitKey(l.prefix, key), l.limit, l.window)
+		if err == nil {
+			return allowed
+		}
+		log.Warn().Err(err).Str("limiter", l.prefix).Msg("Distributed rate limiter unavailable; using local fallback")
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.lastCleanup.IsZero() || now.Sub(l.lastCleanup) >= l.window {
+		for entryKey, entry := range l.entries {
+			if now.Sub(entry.windowStart) >= l.window {
+				delete(l.entries, entryKey)
+			}
+		}
+		l.lastCleanup = now
+	}
+
+	entry := l.entries[key]
+	if entry.windowStart.IsZero() || now.Sub(entry.windowStart) >= l.window {
+		l.entries[key] = rateLimitEntry{count: 1, windowStart: now}
+		return true
+	}
+	if entry.count >= l.limit {
+		return false
+	}
+	entry.count++
+	l.entries[key] = entry
+	return true
+}
 
 func (a *App) loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
+		requestID := strings.TrimSpace(r.Header.Get("X-Request-ID"))
+		if requestID == "" || len(requestID) > 128 {
+			requestID = newRequestID()
+		}
+		w.Header().Set("X-Request-ID", requestID)
+		r = r.WithContext(context.WithValue(r.Context(), requestIDContextKey{}, requestID))
+		response := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		log.Info().
+			Str("request_id", requestID).
 			Str("method", r.Method).
 			Str("path", r.URL.Path).
-			Str("remote_addr", r.RemoteAddr).
 			Msg("Request started")
 
-		next.ServeHTTP(w, r)
+		next.ServeHTTP(response, r)
+		route := "unmatched"
+		if current := mux.CurrentRoute(r); current != nil {
+			if template, err := current.GetPathTemplate(); err == nil {
+				route = template
+			}
+		}
+		a.observability.ObserveHTTP(route, response.status, time.Since(start))
 
 		log.Info().
+			Str("request_id", requestID).
 			Str("method", r.Method).
 			Str("path", r.URL.Path).
+			Int("status", response.status).
 			Dur("duration", time.Since(start)).
 			Msg("Request completed")
 	})
+}
+
+func (a *App) securityHeadersMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (a *App) csrfMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions || r.URL.Path == "/api/v1/collect" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if _, err := r.Cookie("session_token"); err != nil || strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		source := r.Header.Get("Origin")
+		if source == "" {
+			source = r.Header.Get("Referer")
+		}
+		parsed, err := url.Parse(source)
+		if err != nil || source == "" || !a.sameOrigin(parsed, r) {
+			a.jsonError(w, "Cross-origin request rejected", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (a *App) sameOrigin(source *url.URL, r *http.Request) bool {
+	if !strings.EqualFold(source.Host, r.Host) {
+		return false
+	}
+	return strings.EqualFold(source.Scheme, a.requestMeta.Scheme(r))
+}
+
+func (a *App) authRateLimitMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !a.authLimiter.allow(r.Context(), a.clientIP(r), time.Now()) {
+			w.Header().Set("Retry-After", "900")
+			a.jsonError(w, "Too many authentication attempts", http.StatusTooManyRequests)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (a *App) clientIP(request *http.Request) string {
+	return a.requestMeta.ClientIP(request)
+}
+
+type requestIDContextKey struct{}
+
+type statusRecorder struct {
+	http.ResponseWriter
+	status      int
+	wroteHeader bool
+}
+
+func (w *statusRecorder) WriteHeader(status int) {
+	if w.wroteHeader {
+		return
+	}
+	w.wroteHeader = true
+	w.status = status
+	w.ResponseWriter.WriteHeader(status)
+}
+
+func newRequestID() string {
+	value := make([]byte, 12)
+	_, _ = rand.Read(value)
+	return hex.EncodeToString(value)
+}
+
+func rateLimitKey(prefix, key string) string {
+	hash := sha256.Sum256([]byte(key))
+	return "svgstat:ratelimit:" + prefix + ":" + hex.EncodeToString(hash[:16])
 }
 
 func (a *App) getAuthToken(r *http.Request) string {

@@ -15,6 +15,67 @@
                 </button>
             </div>
 
+            <div class="rounded-xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3" :class="installation.status === 'installed' ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50'">
+                <div>
+                    <div class="font-semibold" :class="installation.status === 'installed' ? 'text-green-900' : 'text-amber-900'" x-text="installation.status === 'installed' ? t('installationReady') : t('installationPending')"></div>
+                    <div class="text-sm mt-1" :class="installation.status === 'installed' ? 'text-green-700' : 'text-amber-700'" x-text="installation.status === 'installed' ? `${t('lastRequest')} ${formatDateTime(installation.lastSeenAt)}` : t('installationPendingHint')"></div>
+                </div>
+                <button x-show="installation.status !== 'installed'" @click="openCodeModal(selectedProject, true)" class="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700" x-text="t('getCode')"></button>
+            </div>
+
+			<div class="bg-white rounded-xl shadow-sm p-6 stat-card">
+				<div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3"><div><h3 class="font-semibold text-gray-900" x-text="t('issueCenterTitle')"></h3><p class="text-sm text-gray-500 mt-1" x-text="t('issueCenterHint')"></p></div><div class="flex items-center gap-3"><span class="rounded-full border px-3 py-1 text-xs font-medium" :class="getIssueStatusClass(issueReport.status)" x-text="t(`issueStatus_${issueReport.status}`)"></span><div x-show="loadingIssues" class="animate-spin w-5 h-5 border-2 border-purple-200 border-purple-600 rounded-full"></div></div></div>
+				<div x-show="issueReport.issues.length" class="mt-5 space-y-3"><template x-for="issue in issueReport.issues" :key="`${issue.code}-${issue.subject}`"><div class="rounded-xl border p-4" :class="getIssueClass(issue.severity)"><div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3"><div class="min-w-0"><div class="flex items-center gap-2"><span class="rounded-full px-2 py-0.5 text-xs font-semibold uppercase" :class="issue.severity === 'critical' ? 'bg-red-600 text-white' : 'bg-amber-500 text-white'" x-text="t(`issueSeverity_${issue.severity}`)"></span><h4 class="font-semibold text-gray-900" x-text="getIssueTitle(issue)"></h4></div><p class="mt-2 text-sm text-gray-700" x-text="getIssueAdvice(issue)"></p></div><div class="shrink-0 rounded-lg bg-white/70 px-3 py-2 text-right text-xs text-gray-500"><div><span x-text="t('issueCurrent')"></span>: <strong class="text-gray-900" x-text="formatIssueValue(issue, 'current')"></strong></div><div><span x-text="t('issuePrevious')"></span>: <span x-text="formatIssueValue(issue, 'previous')"></span></div><div x-show="issue.changePercent != null" class="mt-1 font-medium" :class="issue.changePercent < 0 ? 'text-red-600' : 'text-amber-600'" x-text="formatChange(issue.changePercent)"></div></div></div></div></template></div>
+				<div x-show="!loadingIssues &amp;&amp; issueReport.status === 'healthy'" class="mt-5 rounded-xl border border-green-100 bg-green-50 px-4 py-4 text-sm text-green-700" x-text="t('issueHealthyHint')"></div>
+				<div x-show="!loadingIssues &amp;&amp; issueReport.status === 'insufficient_data'" class="mt-5 rounded-xl border border-blue-100 bg-blue-50 px-4 py-4 text-sm text-blue-700" x-text="t('issueInsufficientHint')"></div>
+			</div>
+
+			<div class="bg-white rounded-xl shadow-sm p-6 stat-card">
+				<div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-5">
+					<div><h3 class="font-semibold text-gray-900" x-text="t('sessionQualityTitle')"></h3><p class="text-sm text-gray-500 mt-1" x-text="t('sessionQualityHint')"></p></div>
+					<div class="flex items-center gap-3"><span class="text-xs text-gray-400" x-text="`${trendDays}${t('daysShort')}`"></span><div x-show="loadingSessionQuality" class="animate-spin w-5 h-5 border-2 border-purple-200 border-purple-600 rounded-full"></div></div>
+				</div>
+				<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+					<div class="rounded-lg bg-violet-50 p-4"><div class="text-2xl font-bold text-violet-600" x-text="sessionQuality.totals.sessions"></div><div class="text-xs text-gray-500" x-text="t('sessions')"></div></div>
+					<div class="rounded-lg bg-amber-50 p-4"><div class="text-2xl font-bold text-amber-600" x-text="formatPercent(sessionQuality.totals.bounceRate)"></div><div class="text-xs text-gray-500" x-text="t('bounceRate')"></div></div>
+					<div class="rounded-lg bg-sky-50 p-4"><div class="text-2xl font-bold text-sky-600" x-text="formatDecimal(sessionQuality.totals.averagePages)"></div><div class="text-xs text-gray-500" x-text="t('pagesPerSession')"></div></div>
+					<div class="rounded-lg bg-emerald-50 p-4"><div class="text-2xl font-bold text-emerald-600" x-text="formatDurationSeconds(sessionQuality.totals.averageDurationSeconds)"></div><div class="text-xs text-gray-500" x-text="t('averageEngagement')"></div></div>
+				</div>
+				<p class="text-xs text-gray-400 mb-5" x-text="t('sessionQualityDefinition')"></p>
+				<div x-show="sessionQuality.totals.sessions" class="grid lg:grid-cols-2 gap-6">
+					<div class="grid sm:grid-cols-2 gap-5">
+						<div><h4 class="text-sm font-medium text-gray-800 mb-3" x-text="t('entryPages')"></h4><div class="space-y-2"><template x-for="entry in sessionQuality.entrances" :key="entry.path"><div class="flex justify-between gap-3 text-sm"><span class="truncate font-mono text-gray-600" :title="entry.path" x-text="entry.path"></span><span class="font-medium text-gray-900" x-text="entry.count"></span></div></template><p x-show="!sessionQuality.entrances.length" class="text-sm text-gray-400" x-text="t('noData')"></p></div></div>
+						<div><h4 class="text-sm font-medium text-gray-800 mb-3" x-text="t('exitPages')"></h4><div class="space-y-2"><template x-for="entry in sessionQuality.exits" :key="entry.path"><div class="flex justify-between gap-3 text-sm"><span class="truncate font-mono text-gray-600" :title="entry.path" x-text="entry.path"></span><span class="font-medium text-gray-900" x-text="entry.count"></span></div></template><p x-show="!sessionQuality.exits.length" class="text-sm text-gray-400" x-text="t('noData')"></p></div></div>
+						<div class="sm:col-span-2 border-t border-gray-100 pt-4"><h4 class="text-sm font-medium text-gray-800 mb-3" x-text="t('pageFlows')"></h4><div class="space-y-2"><template x-for="flow in sessionQuality.flows" :key="`${flow.from}-${flow.to}`"><div class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] items-center gap-2 text-sm"><span class="truncate font-mono text-gray-600" :title="flow.from" x-text="flow.from"></span><span class="text-gray-300">→</span><span class="truncate font-mono text-gray-600" :title="flow.to" x-text="flow.to"></span><span class="font-medium text-gray-900" x-text="flow.count"></span></div></template><p x-show="!sessionQuality.flows.length" class="text-sm text-gray-400" x-text="t('noPageFlows')"></p></div></div>
+					</div>
+					<div><div class="flex items-center justify-between gap-3 mb-3"><h4 class="text-sm font-medium text-gray-800" x-text="t('channelQuality')"></h4><select x-model="sessionQualityDimension" class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm"><template x-for="dimension in ['source','medium','campaign','device','country']" :key="dimension"><option :value="dimension" x-text="t(`dimension_${dimension}`)"></option></template></select></div><div class="overflow-x-auto"><table class="w-full text-sm"><thead class="text-xs text-gray-400 border-b"><tr><th class="text-left py-2" x-text="t('segment')"></th><th class="text-right" x-text="t('sessions')"></th><th class="text-right" x-text="t('bounceRate')"></th><th class="text-right" x-text="t('pagesPerSession')"></th><th class="text-right" x-text="t('averageEngagement')"></th></tr></thead><tbody><template x-for="segment in getSessionQualitySegments()" :key="segment.value"><tr class="border-b border-gray-50"><td class="py-2 max-w-32 truncate" :title="segment.value" x-text="segment.value"></td><td class="text-right" x-text="segment.sessions"></td><td class="text-right" x-text="formatPercent(segment.bounceRate)"></td><td class="text-right" x-text="formatDecimal(segment.averagePages)"></td><td class="text-right" x-text="formatDurationSeconds(segment.averageDurationSeconds)"></td></tr></template></tbody></table><p x-show="!getSessionQualitySegments().length" class="text-center text-sm text-gray-400 py-5" x-text="t('noSessionSegments')"></p></div></div>
+				</div>
+				<p x-show="!sessionQuality.totals.sessions &amp;&amp; !loadingSessionQuality" class="text-center text-gray-500 py-6" x-text="t('noSessionQuality')"></p>
+			</div>
+
+			<div class="bg-white rounded-xl shadow-sm p-6 stat-card">
+				<div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-5"><div><h3 class="font-semibold text-gray-900" x-text="t('webQualityTitle')"></h3><p class="text-sm text-gray-500 mt-1" x-text="t('webQualityHint')"></p></div><span class="rounded-full border px-3 py-1 text-xs font-medium" :class="getQualityStatusClass(eventReport.quality.status)" x-text="t(`quality_${eventReport.quality.status}`)"></span></div>
+				<div class="grid sm:grid-cols-3 gap-3 mb-5"><template x-for="name in ['lcp','inp','cls']" :key="name"><div class="rounded-xl border p-4" :class="getQualityStatusClass(getWebVital(name).rating)"><div class="flex items-center justify-between gap-2"><span class="font-semibold uppercase" x-text="name"></span><span class="text-xs" x-text="t(`quality_${getWebVital(name).rating}`)"></span></div><div class="text-2xl font-bold mt-2" x-text="formatVital(getWebVital(name))"></div><div class="text-xs opacity-75 mt-1" x-text="getWebVital(name).samples ? `${getWebVital(name).samples} ${t('samples')} · ${getWebVital(name).visitors} ${t('anonymousVisitors')}` : t('noQualityData')"></div><p class="text-xs opacity-80 mt-3" x-text="t(`vital_${name}_hint`)"></p></div></template></div>
+				<div class="grid md:grid-cols-2 gap-3"><div class="rounded-xl border border-gray-100 bg-gray-50 p-4"><div class="font-medium text-gray-900" x-text="t('javascriptErrors')"></div><div class="mt-2"><span class="text-2xl font-bold text-red-600" x-text="eventReport.quality.javascript.count"></span><span class="ml-2 text-sm text-gray-500" x-text="`${eventReport.quality.javascript.visitors} ${t('affectedVisitors')}`"></span></div><p class="text-xs text-gray-500 mt-2" x-text="t('javascriptErrorsHint')"></p><p x-show="getQualityDetails('js_error_type').length" class="mt-3 break-words font-mono text-xs text-gray-600" x-text="formatQualityDetails('js_error_type')"></p></div><div class="rounded-xl border border-gray-100 bg-gray-50 p-4"><div class="font-medium text-gray-900" x-text="t('resourceErrors')"></div><div class="mt-2"><span class="text-2xl font-bold text-red-600" x-text="eventReport.quality.resources.count"></span><span class="ml-2 text-sm text-gray-500" x-text="`${eventReport.quality.resources.visitors} ${t('affectedVisitors')}`"></span></div><p class="text-xs text-gray-500 mt-2" x-text="t('resourceErrorsHint')"></p><p x-show="getQualityDetails('resource_target_path').length" class="mt-3 break-words font-mono text-xs text-gray-600" x-text="formatQualityDetails('resource_target_path')"></p></div></div>
+				<div x-show="eventReport.quality.status === 'no_data'" class="mt-4 rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-700" x-text="t('webQualityWaiting')"></div>
+			</div>
+
+			<div class="bg-white rounded-xl shadow-sm p-6 stat-card">
+				<div class="flex items-center justify-between gap-4 mb-4">
+					<div>
+						<h3 class="font-semibold text-gray-900" x-text="t('realtimeOverview')"></h3>
+						<p class="text-sm text-gray-500 mt-1" x-text="projectRealtime.lastSeenAt ? `${t('lastRequest')} ${formatDateTime(projectRealtime.lastSeenAt)}` : t('realtimeWaiting')"></p>
+					</div>
+					<span class="inline-flex items-center gap-2 text-sm text-green-700"><span class="h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse"></span><span x-text="t('live')"></span></span>
+				</div>
+				<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+					<div class="rounded-lg bg-purple-50 p-4"><div class="text-3xl font-bold text-purple-600" x-text="projectRealtime.pv5 || 0"></div><div class="text-sm text-gray-600" x-text="t('pageviews5m')"></div></div>
+					<div class="rounded-lg bg-blue-50 p-4"><div class="text-3xl font-bold text-blue-600" x-text="projectRealtime.visitors5 || 0"></div><div class="text-sm text-gray-600" x-text="t('visitors5m')"></div></div>
+					<div class="rounded-lg bg-purple-50 p-4"><div class="text-3xl font-bold text-purple-600" x-text="projectRealtime.pv30 || 0"></div><div class="text-sm text-gray-600" x-text="t('pageviews30m')"></div></div>
+					<div class="rounded-lg bg-blue-50 p-4"><div class="text-3xl font-bold text-blue-600" x-text="projectRealtime.visitors30 || 0"></div><div class="text-sm text-gray-600" x-text="t('visitors30m')"></div></div>
+				</div>
+			</div>
+
             <div class="bg-white rounded-xl shadow-sm p-6 stat-card">
                 <div class="flex items-center justify-between gap-4 mb-4">
                     <h3 class="font-semibold text-gray-900" x-text="t('todayOverview')"></h3>
@@ -40,96 +101,185 @@
                 </div>
             </div>
 
+            <div class="bg-white rounded-xl shadow-sm p-6 stat-card">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h3 class="font-semibold text-gray-900" x-text="t('trafficTrend')"></h3>
+						<p class="text-sm text-gray-500 mt-1" x-text="projectTrend.startDate &amp;&amp; projectTrend.endDate ? `${formatTrendDate(projectTrend.startDate)} – ${formatTrendDate(projectTrend.endDate)}` : t('trendLoading')"></p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <template x-for="days in [7, 30, 90]" :key="days">
+                            <button
+                                @click="setTrendDays(days)"
+                                class="rounded-lg border px-3 py-1.5 text-sm transition-colors"
+                                :class="trendDays === days ? 'border-purple-600 bg-purple-600 text-white' : 'border-gray-200 bg-white text-gray-600 hover:border-purple-300 hover:text-purple-600'"
+                                x-text="`${days}${t('daysShort')}`">
+                            </button>
+                        </template>
+                        <div x-show="loadingTrend" class="animate-spin w-5 h-5 border-2 border-purple-200 border-purple-600 rounded-full ml-2"></div>
+                    </div>
+                </div>
+
+				<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                    <div class="rounded-lg bg-purple-50 p-3">
+						<div class="flex items-start justify-between gap-2"><div class="text-2xl font-bold text-purple-600" x-text="projectAnalysis.current.pv || 0"></div><span class="text-xs font-medium" :class="projectAnalysis.changes.pv == null ? 'text-gray-400' : (projectAnalysis.changes.pv >= 0 ? 'text-green-600' : 'text-red-600')" x-text="formatChange(projectAnalysis.changes.pv)"></span></div>
+                        <div class="text-xs text-gray-500" x-text="t('trendPV')"></div>
+                    </div>
+                    <div class="rounded-lg bg-blue-50 p-3">
+						<div class="flex items-start justify-between gap-2"><div class="text-2xl font-bold text-blue-600" x-text="projectAnalysis.current.uv || 0"></div><span class="text-xs font-medium" :class="projectAnalysis.changes.uv == null ? 'text-gray-400' : (projectAnalysis.changes.uv >= 0 ? 'text-green-600' : 'text-red-600')" x-text="formatChange(projectAnalysis.changes.uv)"></span></div>
+                        <div class="text-xs text-gray-500" x-text="t('trendUV')"></div>
+                    </div>
+                    <div class="rounded-lg bg-green-50 p-3">
+						<div class="flex items-start justify-between gap-2"><div class="text-2xl font-bold text-green-600" x-text="projectAnalysis.current.requests || 0"></div><span class="text-xs font-medium" :class="projectAnalysis.changes.requests == null ? 'text-gray-400' : (projectAnalysis.changes.requests >= 0 ? 'text-green-600' : 'text-red-600')" x-text="formatChange(projectAnalysis.changes.requests)"></span></div>
+                        <div class="text-xs text-gray-500" x-text="t('trendRequests')"></div>
+                    </div>
+					<div class="rounded-lg bg-orange-50 p-3">
+						<div class="flex items-start justify-between gap-2"><div class="text-2xl font-bold text-orange-600" x-text="projectAnalysis.current.bots || 0"></div><span class="text-xs font-medium" :class="projectAnalysis.changes.bots == null ? 'text-gray-400' : (projectAnalysis.changes.bots >= 0 ? 'text-green-600' : 'text-red-600')" x-text="formatChange(projectAnalysis.changes.bots)"></span></div>
+						<div class="text-xs text-gray-500" x-text="t('bots')"></div>
+					</div>
+                </div>
+				<p class="text-xs text-gray-400 mb-4" x-text="t('comparisonHint')"></p>
+
+                <div class="rounded-xl border border-gray-100 bg-gray-50 p-4 overflow-hidden">
+                    <svg viewBox="0 0 1000 240" class="w-full h-60" preserveAspectRatio="none" role="img" :aria-label="t('trafficTrend')">
+                        <line x1="0" y1="220" x2="1000" y2="220" stroke="#e5e7eb" stroke-width="2"></line>
+                        <line x1="0" y1="110" x2="1000" y2="110" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="8 8"></line>
+                        <polyline :points="getTrendPoints('requests')" fill="none" stroke="#22c55e" stroke-width="5" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"></polyline>
+                        <polyline :points="getTrendPoints('pv')" fill="none" stroke="#9333ea" stroke-width="4" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"></polyline>
+                        <polyline :points="getTrendPoints('uv')" fill="none" stroke="#2563eb" stroke-width="4" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"></polyline>
+                    </svg>
+                    <div class="flex items-center justify-between text-xs text-gray-400 mt-2">
+                        <span x-text="formatTrendDate(projectTrend.startDate)"></span>
+                        <div class="flex flex-wrap justify-center gap-4 text-gray-600">
+                            <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-purple-600"></span><span x-text="t('trendPV')"></span></span>
+                            <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span><span x-text="t('trendUV')"></span></span>
+                            <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-green-500"></span><span x-text="t('trendRequests')"></span></span>
+                        </div>
+                        <span x-text="formatTrendDate(projectTrend.endDate)"></span>
+                    </div>
+                </div>
+            </div>
+
             <div class="grid md:grid-cols-2 gap-6">
                 <div class="bg-white rounded-xl shadow-sm p-6 stat-card">
                     <h3 class="font-semibold text-gray-900 mb-4" x-text="t('topReferrers')"></h3>
-                    <div class="space-y-3" x-show="getSortedEntries(projectStats.referrers, 8).length > 0">
-                        <template x-for="entry in getSortedEntries(projectStats.referrers, 8)" :key="entry[0]">
+					<div class="space-y-3" x-show="getSortedEntries(projectAnalysis.breakdowns.referrers, 8).length > 0">
+						<template x-for="entry in getSortedEntries(projectAnalysis.breakdowns.referrers, 8)" :key="entry[0]">
                             <div class="flex items-center justify-between gap-4">
                                 <span class="text-gray-700 truncate flex-1" x-text="entry[0]"></span>
                                 <div class="flex items-center space-x-2 shrink-0">
                                     <div class="w-32 bg-gray-200 rounded-full h-2">
-                                        <div class="bg-pink-500 h-2 rounded-full" :style="getBarStyle(entry[1], projectStats.referrers)"></div>
+										<div class="bg-pink-500 h-2 rounded-full" :style="getBarStyle(entry[1], projectAnalysis.breakdowns.referrers)"></div>
                                     </div>
                                     <span class="text-sm text-gray-500 min-w-8 text-right" x-text="entry[1]"></span>
                                 </div>
                             </div>
                         </template>
                     </div>
-                    <p x-show="getSortedEntries(projectStats.referrers, 8).length === 0" class="text-gray-500 text-center py-4" x-text="t('referrerHint')"></p>
+					<p x-show="getSortedEntries(projectAnalysis.breakdowns.referrers, 8).length === 0" class="text-gray-500 text-center py-4" x-text="t('referrerHint')"></p>
                 </div>
 
                 <div class="bg-white rounded-xl shadow-sm p-6 stat-card">
                     <h3 class="font-semibold text-gray-900 mb-4" x-text="t('topCountries')"></h3>
-                    <div class="space-y-3" x-show="getSortedEntries(projectStats.countries, 8).length > 0">
-                        <template x-for="entry in getSortedEntries(projectStats.countries, 8)" :key="entry[0]">
+					<div class="space-y-3" x-show="getSortedEntries(projectAnalysis.breakdowns.countries, 8).length > 0">
+						<template x-for="entry in getSortedEntries(projectAnalysis.breakdowns.countries, 8)" :key="entry[0]">
                             <div class="flex items-center justify-between gap-4">
                                 <span class="text-gray-700" x-text="entry[0]"></span>
                                 <div class="flex items-center space-x-2">
                                     <div class="w-32 bg-gray-200 rounded-full h-2">
-                                        <div class="bg-purple-500 h-2 rounded-full" :style="getBarStyle(entry[1], projectStats.countries)"></div>
+										<div class="bg-purple-500 h-2 rounded-full" :style="getBarStyle(entry[1], projectAnalysis.breakdowns.countries)"></div>
                                     </div>
                                     <span class="text-sm text-gray-500 min-w-8 text-right" x-text="entry[1]"></span>
                                 </div>
                             </div>
                         </template>
                     </div>
-                    <p x-show="getSortedEntries(projectStats.countries, 8).length === 0" class="text-gray-500 text-center py-4" x-text="t('noData')"></p>
+					<p x-show="getSortedEntries(projectAnalysis.breakdowns.countries, 8).length === 0" class="text-gray-500 text-center py-4" x-text="t('noData')"></p>
                 </div>
 
                 <div class="bg-white rounded-xl shadow-sm p-6 stat-card">
-                    <h3 class="font-semibold text-gray-900 mb-4" x-text="t('topPaths')"></h3>
-                    <div class="space-y-3" x-show="getSortedEntries(projectStats.paths, 8).length > 0">
-                        <template x-for="entry in getSortedEntries(projectStats.paths, 8)" :key="entry[0]">
+					<h3 class="font-semibold text-gray-900 mb-4" x-text="t('topPages')"></h3>
+					<div class="space-y-3" x-show="getSortedEntries(projectAnalysis.breakdowns.paths, 8).length > 0">
+						<template x-for="entry in getSortedEntries(projectAnalysis.breakdowns.paths, 8)" :key="entry[0]">
                             <div class="flex items-center justify-between gap-4">
                                 <span class="text-gray-700 truncate flex-1" x-text="formatBadgePath(entry[0])" :title="entry[0]"></span>
                                 <div class="flex items-center space-x-2 shrink-0">
                                     <div class="w-32 bg-gray-200 rounded-full h-2">
-                                        <div class="bg-blue-500 h-2 rounded-full" :style="getBarStyle(entry[1], projectStats.paths)"></div>
+										<div class="bg-blue-500 h-2 rounded-full" :style="getBarStyle(entry[1], projectAnalysis.breakdowns.paths)"></div>
                                     </div>
                                     <span class="text-sm text-gray-500 min-w-8 text-right" x-text="entry[1]"></span>
                                 </div>
                             </div>
                         </template>
                     </div>
-                    <p x-show="getSortedEntries(projectStats.paths, 8).length === 0" class="text-gray-500 text-center py-4" x-text="t('noData')"></p>
+					<p x-show="getSortedEntries(projectAnalysis.breakdowns.paths, 8).length === 0" class="text-gray-500 text-center py-4" x-text="t('noData')"></p>
                 </div>
 
                 <div class="bg-white rounded-xl shadow-sm p-6 stat-card">
                     <h3 class="font-semibold text-gray-900 mb-4" x-text="t('topDevices')"></h3>
-                    <div class="space-y-3" x-show="getSortedEntries(projectStats.devices).length > 0">
-                        <template x-for="entry in getSortedEntries(projectStats.devices)" :key="entry[0]">
+					<div class="space-y-3" x-show="getSortedEntries(projectAnalysis.breakdowns.devices).length > 0">
+						<template x-for="entry in getSortedEntries(projectAnalysis.breakdowns.devices)" :key="entry[0]">
                             <div class="flex items-center justify-between gap-4">
                                 <span class="text-gray-700" x-text="entry[0]"></span>
                                 <div class="flex items-center space-x-2">
                                     <div class="w-32 bg-gray-200 rounded-full h-2">
-                                        <div class="bg-green-500 h-2 rounded-full" :style="getBarStyle(entry[1], projectStats.devices)"></div>
+										<div class="bg-green-500 h-2 rounded-full" :style="getBarStyle(entry[1], projectAnalysis.breakdowns.devices)"></div>
                                     </div>
                                     <span class="text-sm text-gray-500 min-w-8 text-right" x-text="entry[1]"></span>
                                 </div>
                             </div>
                         </template>
                     </div>
-                    <p x-show="getSortedEntries(projectStats.devices).length === 0" class="text-gray-500 text-center py-4" x-text="t('noData')"></p>
+					<p x-show="getSortedEntries(projectAnalysis.breakdowns.devices).length === 0" class="text-gray-500 text-center py-4" x-text="t('noData')"></p>
                 </div>
 
                 <div class="bg-white rounded-xl shadow-sm p-6 stat-card">
                     <h3 class="font-semibold text-gray-900 mb-4" x-text="t('topBrowsers')"></h3>
-                    <div class="space-y-3" x-show="getSortedEntries(projectStats.browsers).length > 0">
-                        <template x-for="entry in getSortedEntries(projectStats.browsers)" :key="entry[0]">
+					<div class="space-y-3" x-show="getSortedEntries(projectAnalysis.breakdowns.browsers).length > 0">
+						<template x-for="entry in getSortedEntries(projectAnalysis.breakdowns.browsers)" :key="entry[0]">
                             <div class="flex items-center justify-between gap-4">
                                 <span class="text-gray-700" x-text="entry[0]"></span>
                                 <div class="flex items-center space-x-2">
                                     <div class="w-32 bg-gray-200 rounded-full h-2">
-                                        <div class="bg-orange-500 h-2 rounded-full" :style="getBarStyle(entry[1], projectStats.browsers)"></div>
+										<div class="bg-orange-500 h-2 rounded-full" :style="getBarStyle(entry[1], projectAnalysis.breakdowns.browsers)"></div>
                                     </div>
                                     <span class="text-sm text-gray-500 min-w-8 text-right" x-text="entry[1]"></span>
                                 </div>
                             </div>
                         </template>
                     </div>
-                    <p x-show="getSortedEntries(projectStats.browsers).length === 0" class="text-gray-500 text-center py-4" x-text="t('noData')"></p>
+                    <p x-show="getSortedEntries(projectAnalysis.breakdowns.browsers).length === 0" class="text-gray-500 text-center py-4" x-text="t('noData')"></p>
                 </div>
+
+				<div class="bg-white rounded-xl shadow-sm p-6 stat-card">
+					<h3 class="font-semibold text-gray-900 mb-4" x-text="t('trafficSources')"></h3>
+					<div class="space-y-3" x-show="getSortedEntries(projectAnalysis.breakdowns.sources, 8).length > 0">
+						<template x-for="entry in getSortedEntries(projectAnalysis.breakdowns.sources, 8)" :key="entry[0]">
+							<div class="flex items-center justify-between gap-4"><span class="text-gray-700 truncate flex-1" x-text="entry[0]"></span><div class="flex items-center space-x-2 shrink-0"><div class="w-32 bg-gray-200 rounded-full h-2"><div class="bg-indigo-500 h-2 rounded-full" :style="getBarStyle(entry[1], projectAnalysis.breakdowns.sources)"></div></div><span class="text-sm text-gray-500 min-w-8 text-right" x-text="entry[1]"></span></div></div>
+						</template>
+					</div>
+					<p x-show="getSortedEntries(projectAnalysis.breakdowns.sources, 8).length === 0" class="text-gray-500 text-center py-4" x-text="t('noData')"></p>
+				</div>
+
+				<div class="bg-white rounded-xl shadow-sm p-6 stat-card">
+					<h3 class="font-semibold text-gray-900 mb-4" x-text="t('trafficMediums')"></h3>
+					<div class="space-y-3" x-show="getSortedEntries(projectAnalysis.breakdowns.mediums, 8).length > 0">
+						<template x-for="entry in getSortedEntries(projectAnalysis.breakdowns.mediums, 8)" :key="entry[0]">
+							<div class="flex items-center justify-between gap-4"><span class="text-gray-700 truncate flex-1" x-text="entry[0]"></span><div class="flex items-center space-x-2 shrink-0"><div class="w-32 bg-gray-200 rounded-full h-2"><div class="bg-teal-500 h-2 rounded-full" :style="getBarStyle(entry[1], projectAnalysis.breakdowns.mediums)"></div></div><span class="text-sm text-gray-500 min-w-8 text-right" x-text="entry[1]"></span></div></div>
+						</template>
+					</div>
+					<p x-show="getSortedEntries(projectAnalysis.breakdowns.mediums, 8).length === 0" class="text-gray-500 text-center py-4" x-text="t('noData')"></p>
+				</div>
+
+				<div class="bg-white rounded-xl shadow-sm p-6 stat-card">
+					<h3 class="font-semibold text-gray-900 mb-4" x-text="t('campaigns')"></h3>
+					<div class="space-y-3" x-show="getSortedEntries(projectAnalysis.breakdowns.campaigns, 8).length > 0">
+						<template x-for="entry in getSortedEntries(projectAnalysis.breakdowns.campaigns, 8)" :key="entry[0]">
+							<div class="flex items-center justify-between gap-4"><span class="text-gray-700 truncate flex-1" x-text="entry[0]"></span><div class="flex items-center space-x-2 shrink-0"><div class="w-32 bg-gray-200 rounded-full h-2"><div class="bg-rose-500 h-2 rounded-full" :style="getBarStyle(entry[1], projectAnalysis.breakdowns.campaigns)"></div></div><span class="text-sm text-gray-500 min-w-8 text-right" x-text="entry[1]"></span></div></div>
+						</template>
+					</div>
+					<p x-show="getSortedEntries(projectAnalysis.breakdowns.campaigns, 8).length === 0" class="text-gray-500 text-center py-4" x-text="t('campaignHint')"></p>
+				</div>
 
                 <div class="bg-white rounded-xl shadow-sm p-6 stat-card">
                     <h3 class="font-semibold text-gray-900 mb-4" x-text="t('topIPs')"></h3>
@@ -149,6 +299,56 @@
                     <p x-show="getSortedEntries(projectStats.ips, 8).length === 0" class="text-gray-500 text-center py-4" x-text="t('noData')"></p>
                 </div>
             </div>
+
+			<div class="bg-white rounded-xl shadow-sm p-6 stat-card">
+				<div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-5">
+					<div><h3 class="font-semibold text-gray-900" x-text="t('diagnosticsTitle')"></h3><p class="text-sm text-gray-500 mt-1" x-text="t('diagnosticsHint')"></p></div>
+					<div class="flex items-center gap-2"><span class="rounded-full border px-3 py-1 text-xs font-medium" :class="getDiagnosticStatusClass()" x-text="t(`diagnostics_${diagnostics.status}`)"></span><button @click="loadDiagnostics(selectedProject.id)" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:text-purple-600" x-text="t('refresh')"></button><button @click="clearDiagnostics" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:text-red-600" x-text="t('clear')"></button></div>
+				</div>
+				<div class="grid grid-cols-3 gap-3 mb-5"><div class="rounded-lg bg-green-50 p-3"><div class="text-2xl font-bold text-green-600" x-text="diagnostics.accepted"></div><div class="text-xs text-gray-500" x-text="t('acceptedEvents')"></div></div><div class="rounded-lg bg-red-50 p-3"><div class="text-2xl font-bold text-red-600" x-text="diagnostics.rejected"></div><div class="text-xs text-gray-500" x-text="t('rejectedEvents')"></div></div><div class="rounded-lg bg-blue-50 p-3"><div class="text-2xl font-bold text-blue-600" x-text="diagnostics.testEvents"></div><div class="text-xs text-gray-500" x-text="t('testEvents')"></div></div></div>
+				<div x-show="diagnostics.issues.length" class="space-y-2 mb-5"><template x-for="issue in diagnostics.issues" :key="issue.code"><div class="rounded-lg border px-4 py-3 text-sm" :class="issue.severity === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-amber-200 bg-amber-50 text-amber-700'" x-text="t(`diagnostic_${issue.code}`) || issue.message"></div></template></div>
+				<div class="rounded-xl border border-blue-100 bg-blue-50 p-4 mb-5"><div class="flex items-center justify-between gap-3 mb-2"><div><div class="font-medium text-blue-900" x-text="t('testMode')"></div><p class="text-xs text-blue-700 mt-1" x-text="t('testModeHint')"></p></div><button @click="copyText(getTestWebsiteSnippet())" class="rounded-lg bg-blue-600 px-3 py-2 text-sm text-white" x-text="t('copy')"></button></div><code class="block overflow-x-auto whitespace-nowrap rounded-lg bg-gray-900 p-3 text-xs text-gray-100" x-text="getTestWebsiteSnippet()"></code></div>
+				<div class="overflow-x-auto"><table class="w-full text-sm"><thead class="text-xs uppercase text-gray-400 border-b"><tr><th class="text-left py-3 pr-3" x-text="t('time')"></th><th class="text-left py-3 pr-3" x-text="t('status')"></th><th class="text-left py-3 pr-3" x-text="t('eventName')"></th><th class="text-left py-3 pr-3" x-text="t('page')"></th><th class="text-left py-3 pr-3" x-text="t('attribution')"></th><th class="text-left py-3" x-text="t('properties')"></th></tr></thead><tbody class="divide-y divide-gray-100"><template x-for="(entry,index) in diagnostics.entries" :key="`${entry.timestamp}-${index}`"><tr><td class="py-3 pr-3 text-gray-500 whitespace-nowrap" x-text="formatDateTime(entry.timestamp)"></td><td class="py-3 pr-3"><span class="text-xs font-medium" :class="entry.status === 'accepted' ? 'text-green-600' : 'text-red-600'" x-text="entry.mode === 'test' ? `${entry.status} · test` : entry.status"></span><div x-show="entry.reason" class="text-xs text-red-400" x-text="entry.reason"></div></td><td class="py-3 pr-3 font-mono text-purple-700" x-text="getDiagnosticType(entry)"></td><td class="py-3 pr-3 max-w-40 truncate" :title="entry.path" x-text="entry.path || '-'"></td><td class="py-3 pr-3 text-xs text-gray-500" x-text="[entry.source,entry.medium,entry.campaign].filter(Boolean).join(' / ') || '-'"></td><td class="py-3 text-xs font-mono text-gray-500" x-text="(entry.propertyKeys || []).join(', ') || '-'"></td></tr></template></tbody></table><p x-show="!diagnostics.entries.length" class="text-center text-gray-500 py-6" x-text="t('noDiagnostics')"></p></div>
+			</div>
+
+			<div class="bg-white rounded-xl shadow-sm p-6 stat-card">
+				<div class="flex items-center justify-between gap-4 mb-5">
+					<div><h3 class="font-semibold text-gray-900" x-text="t('customEvents')"></h3><p class="text-sm text-gray-500 mt-1" x-text="t('customEventsHint')"></p></div>
+					<div x-show="loadingConversions" class="animate-spin w-5 h-5 border-2 border-purple-200 border-purple-600 rounded-full"></div>
+				</div>
+				<div class="overflow-x-auto" x-show="eventReport.events.length">
+					<table class="w-full text-left"><thead class="text-xs uppercase text-gray-400 border-b"><tr><th class="py-3 pr-4" x-text="t('eventName')"></th><th class="py-3 pr-4" x-text="t('eventCount')"></th><th class="py-3 pr-4" x-text="t('converters')"></th><th class="py-3 pr-4" x-text="t('conversionRate')"></th><th class="py-3 pr-4" x-text="t('topSource')"></th><th class="py-3" x-text="t('eventValue')"></th></tr></thead>
+						<tbody class="divide-y divide-gray-100"><template x-for="event in eventReport.events" :key="event.name"><tr><td class="py-4 pr-4 font-mono text-sm text-purple-700" x-text="event.name"></td><td class="py-4 pr-4 font-semibold" x-text="event.count"></td><td class="py-4 pr-4" x-text="event.visitors"></td><td class="py-4 pr-4" x-text="formatPercent(event.rate)"></td><td class="py-4 pr-4" x-text="getTopKey(event.sources)"></td><td class="py-4" x-text="formatEventValues(event.values)"></td></tr></template></tbody>
+					</table>
+				</div>
+				<p x-show="!eventReport.events.length" class="text-gray-500 text-center py-6" x-text="t('noEvents')"></p>
+				<div x-show="eventReport.events.length" class="mt-6 rounded-xl border border-gray-100 bg-gray-50 p-4">
+					<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4"><div><div class="font-medium text-gray-900" x-text="t('eventTrend')"></div><div class="text-xs text-gray-500" x-text="t('eventTrendHint')"></div></div><select x-model="selectedEventName" class="rounded-lg border border-gray-200 bg-white px-3 py-2 font-mono text-sm"><template x-for="event in eventReport.events" :key="event.name"><option :value="event.name" x-text="event.name"></option></template></select></div>
+					<svg viewBox="0 0 1000 230" class="w-full h-48" preserveAspectRatio="none" role="img" :aria-label="t('eventTrend')"><line x1="0" y1="220" x2="1000" y2="220" stroke="#e5e7eb" stroke-width="2"></line><polyline :points="getEventTrendPoints('count')" fill="none" stroke="#7c3aed" stroke-width="4" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"></polyline><polyline :points="getEventTrendPoints('visitors')" fill="none" stroke="#0ea5e9" stroke-width="4" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"></polyline></svg>
+					<div class="flex items-center justify-center gap-5 text-xs text-gray-600"><span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-purple-600"></span><span x-text="t('eventCount')"></span></span><span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-sky-500"></span><span x-text="t('converters')"></span></span></div>
+					<div x-show="getSelectedEventDetails().length" class="mt-5 border-t border-gray-200 pt-4">
+						<div class="font-medium text-gray-900" x-text="t('eventDetails')"></div><div class="text-xs text-gray-500 mt-1 mb-3" x-text="t('eventDetailsHint')"></div>
+						<div class="grid md:grid-cols-2 gap-3"><template x-for="([property, values]) in getSelectedEventDetails()" :key="property"><div class="rounded-lg border border-gray-200 bg-white p-3"><div class="mb-2 font-mono text-xs font-medium text-purple-700" x-text="property"></div><div class="space-y-1.5"><template x-for="detail in values" :key="detail.value"><div class="flex items-center justify-between gap-4 text-sm"><span class="truncate text-gray-700" :title="detail.value" x-text="detail.value"></span><span class="shrink-0 text-xs text-gray-500" x-text="`${detail.visitors} ${t('anonymousVisitors')}`"></span></div></template></div></div></template></div>
+					</div>
+				</div>
+				<div class="mt-5 rounded-lg bg-gray-900 p-4 text-sm text-gray-100 font-mono overflow-x-auto whitespace-nowrap">window.svgstat('event', 'signup')<br>window.svgstat('event', 'purchase', { value: 99, currency: 'CNY' })</div>
+			</div>
+
+			<div class="grid lg:grid-cols-2 gap-6">
+				<div class="bg-white rounded-xl shadow-sm p-6 stat-card">
+					<h3 class="font-semibold text-gray-900" x-text="t('conversionGoals')"></h3><p class="text-sm text-gray-500 mt-1 mb-5" x-text="t('conversionGoalsHint')"></p>
+					<form @submit.prevent="createGoal" class="grid sm:grid-cols-3 gap-3 mb-5"><input x-model="newGoal.name" required maxlength="80" class="rounded-lg border border-gray-200 px-3 py-2" :placeholder="t('goalName')"><input x-model="newGoal.eventName" required maxlength="64" class="rounded-lg border border-gray-200 px-3 py-2 font-mono" :placeholder="t('eventName')"><button class="rounded-lg bg-purple-600 px-4 py-2 text-white" x-text="t('createGoal')"></button></form>
+					<div x-show="conversionGoals.length" class="flex justify-end mb-3"><select x-model="conversionDimension" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"><template x-for="dimension in ['source','medium','campaign','path','device','country']" :key="dimension"><option :value="dimension" x-text="t(`dimension_${dimension}`)"></option></template></select></div>
+					<div class="space-y-3"><template x-for="goal in conversionGoals" :key="goal.id"><div class="rounded-lg border border-gray-100 p-4"><div class="flex items-center justify-between gap-4"><div><div class="font-medium text-gray-900" x-text="goal.name"></div><div class="text-sm text-gray-500"><span class="font-mono" x-text="goal.eventName"></span> · <span x-text="`${getEvent(goal.eventName).visitors} ${t('converters')} · ${formatPercent(getEvent(goal.eventName).rate)}`"></span></div></div><button @click="deleteGoal(goal.id)" class="text-sm text-red-500 hover:text-red-700" x-text="t('delete')"></button></div><div x-show="getConversionSegments(goal.eventName).length" class="mt-3 overflow-x-auto"><table class="w-full text-sm"><thead class="text-xs text-gray-400"><tr><th class="text-left py-2" x-text="t('segment')"></th><th class="text-right" x-text="t('audience')"></th><th class="text-right" x-text="t('converters')"></th><th class="text-right" x-text="t('conversionRate')"></th></tr></thead><tbody><template x-for="segment in getConversionSegments(goal.eventName)" :key="segment.value"><tr class="border-t border-gray-50"><td class="py-2 max-w-36 truncate" :title="segment.value" x-text="segment.value"></td><td class="text-right" x-text="segment.audience"></td><td class="text-right" x-text="segment.converters"></td><td class="text-right font-medium text-purple-600" x-text="formatPercent(segment.rate)"></td></tr></template></tbody></table></div></div></template><p x-show="!conversionGoals.length" class="text-gray-500 text-center py-4" x-text="t('noGoals')"></p></div>
+				</div>
+
+				<div class="bg-white rounded-xl shadow-sm p-6 stat-card">
+					<h3 class="font-semibold text-gray-900" x-text="t('funnels')"></h3><p class="text-sm text-gray-500 mt-1 mb-5" x-text="t('funnelsHint')"></p>
+					<form @submit.prevent="createFunnel" class="space-y-3 mb-5"><input x-model="newFunnel.name" required maxlength="80" class="w-full rounded-lg border border-gray-200 px-3 py-2" :placeholder="t('funnelName')"><textarea x-model="newFunnel.stepsText" required rows="2" class="w-full rounded-lg border border-gray-200 px-3 py-2 font-mono" :placeholder="t('funnelStepsPlaceholder')"></textarea><button class="rounded-lg bg-purple-600 px-4 py-2 text-white" x-text="t('createFunnel')"></button></form>
+					<div x-show="funnels.length" class="flex justify-end mb-3"><select x-model="funnelDimension" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"><template x-for="dimension in ['source','medium','campaign','path','device','country']" :key="dimension"><option :value="dimension" x-text="t(`dimension_${dimension}`)"></option></template></select></div>
+					<div class="space-y-4"><template x-for="funnel in funnels" :key="funnel.id"><div class="rounded-lg border border-gray-100 p-4"><div class="flex justify-between gap-4 mb-3"><div class="font-medium" x-text="funnel.name"></div><button @click="deleteFunnel(funnel.id)" class="text-sm text-red-500" x-text="t('delete')"></button></div><div class="space-y-2"><template x-for="(step, index) in (funnelReports[funnel.id]?.steps || [])" :key="`${funnel.id}-${index}`"><div><div class="flex justify-between text-sm mb-1"><span><span class="text-gray-400" x-text="`${index + 1}. `"></span><span class="font-mono" x-text="step.eventName"></span></span><span x-text="`${step.visitors} · ${formatPercent(step.conversionRate)}`"></span></div><div class="h-2 rounded-full bg-gray-100"><div class="h-2 rounded-full bg-purple-500" :style="`width: ${Math.max(0, Math.min(100, step.conversionRate))}%`"></div></div><div x-show="index > 0" class="text-xs text-gray-400 mt-1" x-text="`${t('dropOff')}: ${formatPercent(step.dropOffRate)}`"></div></div></template></div><div x-show="getFunnelSegments(funnel.id).length" class="mt-4 border-t border-gray-100 pt-3"><div class="text-xs uppercase text-gray-400 mb-2" x-text="t('funnelComparison')"></div><template x-for="segment in getFunnelSegments(funnel.id)" :key="segment.value"><div class="grid grid-cols-[minmax(0,1fr)_auto] gap-3 py-1.5 text-sm"><div class="truncate" :title="segment.value"><span x-text="segment.value"></span><span class="text-xs text-gray-400 ml-2" x-text="formatFunnelSteps(segment.steps)"></span></div><span class="font-medium text-purple-600" x-text="formatPercent(segment.conversionRate)"></span></div></template></div></div></template><p x-show="!funnels.length" class="text-gray-500 text-center py-4" x-text="t('noFunnels')"></p></div>
+				</div>
+			</div>
 
             <div class="bg-white rounded-xl shadow-sm p-6 stat-card">
                 <div class="flex items-center justify-between gap-4 mb-4">

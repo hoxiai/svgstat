@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="SVGStat 管理端">
+    <title>SVGStat 管理端</title>
+    <link rel="stylesheet" href="/admin/static/admin.css">
+</head>
+<body>
+    <div id="app">
+        <section id="auth-screen" class="auth-screen hidden">
+            <div class="auth-brand">
+                <span class="brand-mark">S</span>
+                <span>SVGStat</span>
+            </div>
+            <form id="login-form" class="auth-card">
+                <p class="eyebrow">ADMIN CONSOLE</p>
+                <h1>管理端登录</h1>
+                <p class="muted">使用已配置为管理员的 SVGStat 账号登录。</p>
+                <label>邮箱<input id="login-email" type="email" autocomplete="username" required placeholder="admin@example.com"></label>
+                <label>密码<input id="login-password" type="password" autocomplete="current-password" required placeholder="至少 8 位"></label>
+                <p id="login-error" class="form-error hidden"></p>
+                <button id="login-button" class="button primary wide" type="submit">登录管理端</button>
+                <a class="back-link" href="/">返回用户端</a>
+            </form>
+        </section>
+
+        <section id="forbidden-screen" class="auth-screen hidden">
+            <div class="auth-card center">
+                <span class="large-icon">!</span>
+                <h1>没有管理权限</h1>
+                <p class="muted">当前账号可以使用用户端，但不能访问管理端。</p>
+                <div class="button-row center"><a class="button secondary" href="/dashboard">进入用户端</a><button id="forbidden-logout" class="button primary">退出登录</button></div>
+            </div>
+        </section>
+
+        <section id="console" class="console hidden">
+            <aside class="sidebar">
+                <div class="brand"><span class="brand-mark">S</span><div><strong>SVGStat</strong><small>管理端</small></div></div>
+                <nav>
+                    <button class="nav-item active" data-page="overview"><span>⌁</span>概览</button>
+                    <button class="nav-item" data-page="users"><span>♙</span>用户管理</button>
+                    <button class="nav-item" data-page="projects"><span>◇</span>项目管理</button>
+                </nav>
+                <div class="sidebar-footer">
+                    <a href="/dashboard">打开用户端 ↗</a>
+                    <div class="admin-user"><span id="admin-avatar">A</span><div><strong id="admin-name">管理员</strong><small id="admin-email"></small></div></div>
+                    <button id="logout-button" class="text-button">退出登录</button>
+                </div>
+            </aside>
+
+            <main class="main">
+                <header class="topbar">
+                    <button id="menu-button" class="icon-button" aria-label="打开菜单">☰</button>
+                    <div><h1 id="page-title">管理概览</h1><p id="page-subtitle">掌握平台运行和增长情况</p></div>
+                    <button id="refresh-button" class="button secondary">刷新数据</button>
+                </header>
+
+                <div id="loading" class="loading hidden"><span></span><p>正在加载数据…</p></div>
+                <div id="error-banner" class="error-banner hidden"></div>
+
+                <section id="overview-page" class="page">
+                    <div id="summary-cards" class="summary-grid"></div>
+                    <div class="content-grid">
+                        <article class="panel span-2">
+                            <div class="panel-head"><div><h2>近 7 天请求趋势</h2><p>按持久化统计汇总</p></div><span class="legend"><i></i>请求量</span></div>
+                            <div id="trend-chart" class="trend-chart"></div>
+                        </article>
+                        <article class="panel">
+                            <div class="panel-head"><div><h2>服务状态</h2><p>核心依赖连通性</p></div></div>
+                            <div id="health-list" class="health-list"></div>
+                        </article>
+                        <article class="panel">
+                            <div class="panel-head"><div><h2>流量最高项目</h2><p>近 7 天请求量</p></div><button class="link-button" data-goto="projects">查看全部</button></div>
+                            <div id="top-projects" class="rank-list"></div>
+                        </article>
+                        <article class="panel">
+                            <div class="panel-head"><div><h2>最近注册用户</h2><p>新加入的平台用户</p></div><button class="link-button" data-goto="users">查看全部</button></div>
+                            <div id="recent-users" class="compact-list"></div>
+                        </article>
+                        <article class="panel">
+                            <div class="panel-head"><div><h2>最近创建项目</h2><p>最新项目动态</p></div><button class="link-button" data-goto="projects">查看全部</button></div>
+                            <div id="recent-projects" class="compact-list"></div>
+                        </article>
+                    </div>
+                </section>
+
+                <section id="users-page" class="page hidden">
+                    <div class="toolbar">
+                        <div class="search"><span>⌕</span><input id="user-search" placeholder="搜索邮箱或名称"></div>
+                        <select id="user-status"><option value="">全部状态</option><option value="active">正常</option><option value="disabled">已停用</option></select>
+                    </div>
+                    <article class="panel table-panel">
+                        <div class="table-wrap"><table><thead><tr><th>用户</th><th>角色</th><th>项目</th><th>最近登录</th><th>注册时间</th><th>状态</th><th></th></tr></thead><tbody id="users-table"></tbody></table></div>
+                        <div id="users-pagination" class="pagination"></div>
+                    </article>
+                </section>
+
+                <section id="projects-page" class="page hidden">
+                    <div class="toolbar">
+                        <div class="search"><span>⌕</span><input id="project-search" placeholder="搜索项目、Slug 或用户邮箱"></div>
+                        <select id="project-status"><option value="">全部状态</option><option value="active">运行中</option><option value="disabled">已停用</option><option value="archived">已归档</option><option value="pending">待处理</option><option value="grace">宽限期</option></select>
+                    </div>
+                    <article class="panel table-panel">
+                        <div class="table-wrap"><table><thead><tr><th>项目</th><th>所有者</th><th>近 7 天请求</th><th>能力开关</th><th>状态</th><th></th></tr></thead><tbody id="projects-table"></tbody></table></div>
+                        <div id="projects-pagination" class="pagination"></div>
+                    </article>
+                </section>
+            </main>
+        </section>
+
+        <div id="drawer-backdrop" class="drawer-backdrop hidden"></div>
+        <aside id="drawer" class="drawer hidden"><button id="drawer-close" class="drawer-close">×</button><div id="drawer-content"></div></aside>
+        <div id="toast" class="toast hidden"></div>
+    </div>
+    <script src="/admin/static/admin.js"></script>
+</body>
+</html>

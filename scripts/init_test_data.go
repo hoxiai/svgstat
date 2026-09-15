@@ -1,4 +1,3 @@
-
 package main
 
 import (
@@ -29,20 +28,22 @@ func main() {
 
 	now := time.Now()
 	testProject := &project.Project{
-		ID:                "proj_test_123",
-		ExternalProjectID: "ext_test_123",
-		TenantID:          "tenant_test",
-		Slug:              "my-awesome-project",
-		Name:              "My Awesome Project",
-		Description:       "A test project for SVGStat",
-		Status:            "active",
-		Visibility:        "public",
-		RenderEnabled:     true,
-		BadgeEnabled:      true,
-		WidgetEnabled:     true,
-		ChartEnabled:      false,
-		CreatedAt:         now,
-		UpdatedAt:         now,
+		ID:                     "proj_test_123",
+		ExternalProjectID:      "ext_test_123",
+		TenantID:               "tenant_test",
+		Slug:                   "my-awesome-project",
+		Name:                   "My Awesome Project",
+		Description:            "A test project for SVGStat",
+		Status:                 "active",
+		Visibility:             "public",
+		WebsiteTrackingEnabled: true,
+		WebsiteDomains:         []string{},
+		RenderEnabled:          true,
+		BadgeEnabled:           true,
+		WidgetEnabled:          true,
+		ChartEnabled:           false,
+		CreatedAt:              now,
+		UpdatedAt:              now,
 	}
 
 	err = repo.Create(ctx, testProject)

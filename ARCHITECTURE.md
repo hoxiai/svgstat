@@ -30,48 +30,38 @@ The system should satisfy the following goals:
 
 # 2. Architecture Overview
 
-SVGStat is the runtime engine inside a three-repository SaaS architecture.
+SVGStat is the runtime execution layer behind APay. APay owns the official
+website, user portal, tenancy, billing, and commercial lifecycle. SVGStat owns
+rendering, analytics, runtime configuration, and the local projections needed
+to serve requests without calling APay.
 
 ```text
-Developers / Browsers / README Embeds
-                    │
-                    ▼
-             Cloudflare CDN
-                    │
-                    ▼
-              Go SVG Engine
-                    │
-      ┌─────────────┼─────────────┐
-      ▼             ▼             ▼
-  Renderer      Analytics      REST API
-      │             │             │
-      └──────┬──────┘             │
-             ▼                    │
-           Redis                  │
-             │                    │
-             ▼                    │
-           Worker                 │
-             │                    │
-             ▼                    │
-        PostgreSQL                │
-                                  │
-    APayShop Official Site / User Portal
-                                  │
-                                  ▼
-                  Shoply SaaS Base / Billing / Lifecycle
+APay (Official Site / User Portal)
+        │
+        │ authenticated lifecycle sync
+        ▼
+SVGStat Management API ──────► PostgreSQL
+        │                           │
+        └──── runtime refresh ──────┤
+                                    ▼
+Developers / Browsers ─► CDN ─► SVGStat Runtime
+                                    │
+                         ┌──────────┼──────────┐
+                         ▼          ▼          ▼
+                     Renderer   Analytics   Worker
+                         │          │          │
+                         └──────── Redis ◄─────┘
 ```
 
-The Go service handles all runtime traffic.
-
-APayShop manages public website entry and user-center experience.
-
-Shoply manages SaaS lifecycle, billing, and project control-plane operations.
+The Go service may serve a runtime dashboard and operational admin console, but
+those interfaces do not replace APay's user portal or commercial ownership.
+APay and PostgreSQL are never queried synchronously by the hot SVG path.
 
 ---
 
 # 3. Service Responsibilities
 
-## Go SVG Engine
+## SVGStat Application
 
 Responsible for:
 
@@ -82,42 +72,28 @@ Responsible for:
 * REST API
 * Worker execution
 * Cache management
+* Authentication and sessions
+* Runtime project configuration
+* Operational admin controls and audit logs
 
-The Go service must remain stateless.
-
----
-
-## Shoply
-
-Responsible for:
-
-* Authentication
-* User management
-* OAuth
-* Billing
-* Subscription
-* Dashboard UI
-* Teams
-* API keys
-* Project management
-
-Shoply never renders SVG.
-
-Shoply never participates in hot rendering paths.
+HTTP instances should remain horizontally scalable. Durable SVGStat state and
+APay lifecycle projections live in PostgreSQL, hot runtime state lives in
+Redis, and process memory is used only as a bounded short-lived cache.
 
 ---
 
-## APayShop
+## APay
 
 Responsible for:
 
-* official website
-* pricing and plan discovery
-* user account center
-* purchase entry flow
-* upstream notification into Shoply after payment
+* official website and purchase entry
+* user portal and account-center experience
+* tenant ownership
+* billing, subscription, and commercial lifecycle truth
 
-APayShop should never sit in the hot SVG render path.
+APay sends authenticated, versioned, and idempotent lifecycle changes to
+SVGStat. SVGStat materializes only the runtime fields it needs. APay never
+participates in the hot SVG render path.
 
 ---
 
@@ -146,7 +122,7 @@ Response
 Characteristics:
 
 * No PostgreSQL writes
-* No Shoply calls
+* No external service calls
 * No blocking tasks
 
 ---
@@ -156,9 +132,7 @@ Characteristics:
 ```text
 Browser
     │
-Shoply
-    │
-Go API
+SVGStat API
     │
 Redis
     │
@@ -171,25 +145,24 @@ Dashboard traffic is separated from rendering traffic.
 
 ---
 
-## Control-Plane Provisioning Flow
+## Lifecycle Synchronization
 
 ```text
-User purchases in APayShop
+User completes an account or purchase action in APay
     │
     ▼
-APayShop notifies Shoply
+APay sends an authenticated, idempotent lifecycle event
     │
     ▼
-Shoply provisions or updates project state
-    │
-    ▼
-Shoply syncs SVGStat config
+SVGStat validates and stores the local runtime projection
     │
     ▼
 SVGStat refreshes runtime cache
 ```
 
-Provisioning is separate from rendering.
+Synchronization may be retried or delayed without affecting existing render
+traffic. Local operational administrators may disable runtime access, but they
+do not edit APay billing or tenant truth.
 
 ---
 
@@ -294,9 +267,10 @@ Examples:
 * Projects
 * Historical reports
 * Daily aggregates
-* Billing metadata
+* Runtime configuration and lifecycle projections
 
-PostgreSQL is not a real-time analytics database.
+PostgreSQL is not a real-time analytics database and does not duplicate APay's
+billing ledger or tenant ownership model.
 
 ---
 
@@ -423,6 +397,13 @@ Examples:
 
 The rendering path should be resilient.
 
+Multi-instance rules:
+
+* runtime project writes publish Redis invalidation messages so every instance drops stale process-memory entries
+* analytics workers use a PostgreSQL advisory lock so only one instance flushes a given interval
+* authentication and collection limits use Redis for cross-instance consistency
+* Redis failures may fall back to bounded local rate limiting, but never disable validation or authorization
+
 ---
 
 # 13. Security
@@ -436,6 +417,16 @@ All requests should be:
 * rate-limited
 
 Secrets must never be embedded in SVG output.
+
+Forwarded client and scheme headers are accepted only from explicitly configured trusted proxy IPs or CIDRs. Browser session tokens are stored as hashes.
+
+Operational endpoints are separated by purpose:
+
+* `/health` reports process liveness
+* `/ready` verifies PostgreSQL and Redis readiness
+* `/metrics` exposes runtime counters in Prometheus text format
+
+Exact visitor and segmentation sets use configurable per-project daily bounds. When a bound is reached, aggregate traffic totals continue while new exact visitor detail and high-cardinality dimensions are dropped.
 
 ---
 
@@ -468,7 +459,7 @@ The following rules are non-negotiable:
 6. Workers never block user requests.
 7. Templates generate SVG; code should not manually concatenate SVG strings.
 8. Every package owns a single responsibility.
-9. APayShop and Shoply never join the hot SVG path.
+9. Dashboard, administration, APay, and billing never join the hot SVG path.
 10. Services communicate through stable APIs, not shared implementation details.
 11. Maintainability is more important than cleverness.
 

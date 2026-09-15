@@ -1,0 +1,3 @@
+ALTER TABLE projects
+    ADD COLUMN IF NOT EXISTS website_tracking_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    ADD COLUMN IF NOT EXISTS website_domains TEXT[] NOT NULL DEFAULT '{}';

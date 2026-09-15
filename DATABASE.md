@@ -1,483 +1,133 @@
-# DATABASE.md
-
 # SVGStat Database Design
 
-> This document defines the persistent data model for SVGStat.
->
-> PostgreSQL is used as the durable store inside SVGStat.
->
-> It is **not** responsible for real-time analytics.
->
-> For the first concrete table draft, see `SCHEMA.md`.
->
-> For migration policy and DDL drafts, see `MIGRATIONS.md` and `SQL_DRAFTS.md`.
+> PostgreSQL is the durable store for SVGStat runtime configuration and
+> analytics. Redis is the hot runtime store. APay remains authoritative for
+> tenancy, billing, and commercial lifecycle.
 
----
+# 1. Ownership
 
-# 1. Design Principles
+SVGStat persists:
 
-PostgreSQL is designed for:
+* local dashboard users, roles, sessions, and administration audit logs
+* project runtime projections, configuration, and eligibility
+* API keys and widget configuration
+* conversion goals and funnels
+* daily historical analytics
+* APay synchronization events
 
-* durability
-* consistency
-* historical storage
-* SVGStat-owned persistent data
+Tenant ownership, subscriptions, orders, invoices, payment records, and the
+commercial account lifecycle stay in APay and must not be duplicated here.
 
-PostgreSQL should never become the hot path for SVG rendering.
-
----
-
-# 2. System Context
-
-SVGStat is only one part of the broader product:
-
-* `APayShop` owns the public website, pricing portal, and user-facing account center.
-* `Shoply` owns tenancy, billing, subscription truth, and project lifecycle.
-* `SVGStat` owns runtime rendering, runtime analytics, and historical analytics persistence.
-
-This means the SVGStat database should store SVGStat-owned durable state, not become a duplicate SaaS master database.
-
----
-
-# 3. Responsibilities
-
-Database stores:
-
-* Projects
-* API Keys
-* Historical Statistics
-* Aggregated Reports
-* Project Configuration
-* Runtime-facing shadow state synchronized from the control plane when needed
-
-Database does **not** store:
-
-* Real-time PV
-* Runtime Counters
-* Active Sessions
-* Temporary Cache
-* Billing source-of-truth records
-* Team ownership source-of-truth records
-* Full account-center source-of-truth records
-
-Runtime hot data belongs in Redis.
-
-Billing, team ownership, and account-center truth belong in upstream systems such as Shoply or APayShop.
-
----
-
-# 4. Ownership Boundaries
-
-## Owned by Shoply
-
-Examples:
-
-* tenant identity
-* subscription truth
-* billing state
-* team relationships
-* project lifecycle truth
-
-SVGStat may cache or shadow selected fields required for runtime, but Shoply remains authoritative.
-
----
-
-## Owned by SVGStat
-
-Examples:
-
-* render-facing project records
-* hashed API keys for SVG access
-* historical daily aggregates
-* widget and render configuration needed by the runtime
-
-This keeps the runtime database focused and compact.
-
----
-
-# 5. Storage Layers
+# 2. Storage Layers
 
 ```text
-Memory
-    │
-    ▼
-Redis
-    │
-    ▼
-PostgreSQL
-```
-
-Each layer serves a different purpose.
-
-Never bypass the hierarchy without a strong reason.
-
----
-
-# 6. Entity Relationship
-
-```text
-Shoply Tenant / Project
-          │
-          ▼
-SVGStat Projects
-    │      │
-    │      ├── API Keys
-    │      ├── Daily Stats
-    │      ├── Widgets
-    │      └── Settings
-```
-
-Each project is isolated.
-
-No shared analytics data.
-
----
-
-# 7. projects
-
-Purpose:
-
-Represents an analytics project.
-
-Typical fields:
-
-```text
-id
-
-external_project_id
-
-tenant_id
-
-slug
-
-name
-
-description
-
-status
-
-created_at
-
-updated_at
+Process memory: bounded short-lived cache
+        │
+        ▼
+Redis: counters, current analytics, runtime projections
+        │
+        ▼
+PostgreSQL: durable SVGStat state and historical aggregates
 ```
 
 Rules:
 
-* slug must be globally unique.
-* Project IDs never change.
-* Deleting a project should use soft delete unless explicitly purged.
-* Upstream lifecycle state should be synchronized from Shoply rather than invented independently inside SVGStat.
+* SVG rendering never writes PostgreSQL.
+* Runtime analytics write to Redis first.
+* PostgreSQL stores aggregated analytics, not one row per request.
+* Redis and process memory must be replaceable projections for lifecycle state.
 
----
-
-# 8. api_keys
-
-Purpose:
-
-Authentication between clients and SVGStat.
-
-Fields:
+# 3. Core Relationships
 
 ```text
-id
-
-project_id
-
-name
-
-key_hash
-
-last_used_at
-
-expires_at
-
-created_at
+users
+  ├── sessions
+  ├── projects
+  │     ├── api_keys
+  │     ├── project_limits
+  │     ├── widget_settings
+  │     ├── conversion_goals
+  │     ├── funnels
+  │     └── daily_statistics
+  └── admin_audit_logs
 ```
+
+Each analytics query and runtime key is project-scoped.
+
+# 4. Projects
+
+`projects` is SVGStat's durable runtime representation of a project. It stores
+the APay binding, local access relation, slug, runtime status, feature switches,
+website tracking configuration, and timestamps.
 
 Rules:
 
-* Never store plaintext API keys.
-* Store hashes only.
-* Keys should be revocable.
-* If keys are rotated upstream, SVGStat must update its local runtime copy through explicit sync.
+* slugs are globally unique
+* project IDs are immutable
+* ordinary deletion is soft deletion
+* APay lifecycle transitions are accepted only through authenticated,
+  idempotent synchronization
+* eligibility changes refresh the runtime projection
 
----
+`external_project_id` and `tenant_id` bind the projection to stable APay
+identifiers. They do not make SVGStat the owner of tenant or billing truth.
 
-# 9. daily_statistics
+# 5. Runtime Policy
 
-Purpose:
+`project_limits` stores the runtime policy derived from APay plan state.
+PostgreSQL is authoritative for the materialized SVGStat projection; Redis and
+memory cache the fields needed by public rendering and collection.
 
-Historical analytics.
+`project_sync_events` records authenticated APay synchronization attempts for
+idempotency, replay, and operational auditability.
 
-Typical fields:
+# 6. Historical Analytics
 
-```text
-id
-
-project_id
-
-date
-
-pv
-
-uv
-
-requests
-
-bots
-
-countries
-
-devices
-
-browsers
-
-created_at
-```
-
-This table stores aggregated values only.
-
-Never insert one row per request.
-
----
-
-# 10. widget_settings
-
-Purpose:
-
-Widget configuration.
-
-Examples:
-
-* Theme
-* Colors
-* Layout
-* Counter Style
-* Badge Style
-
-Store configuration as JSONB when appropriate.
-
----
-
-# 11. Control-Plane Derived State
-
-Purpose:
-
-Optional local snapshot of upstream control-plane fields required for runtime-serving decisions.
-
-Examples:
-
-* upstream project status
-* render eligibility flags
-* plan-derived limits relevant to runtime output
-* synchronized public configuration
+`daily_statistics` stores one aggregate row per project and UTC date. JSONB is
+used for bounded distributions such as referrers, paths, devices, events,
+segments, funnels, and session quality.
 
 Rules:
 
-* This state is derived.
-* Shoply remains the source of truth.
-* The schema should remain narrow and runtime-oriented.
-* In the V1 schema draft, this concern is materialized primarily through `project_limits` and `project_sync_events`.
+* workers upsert on `(project_id, date)`
+* high-cardinality dimensions must be bounded
+* raw headers, secrets, and complete per-request payloads are not persisted
+* retention and future columnar-storage migration should be explicit
 
----
+# 7. Credentials and Sessions
 
-# 12. Soft Delete
+API keys must be stored as hashes and support scope, expiration, rotation, and
+revocation. Browser sessions are separate from integration credentials.
 
-Preferred for:
+Session cleanup, administrator session policy, and future token hashing are
+security responsibilities of SVGStat.
 
-* Projects
+# 8. Administration
 
-Use:
+State-changing admin operations use database transactions and write
+`admin_audit_logs` with actor, action, target, before/after data, IP, and time.
 
-```text
-deleted_at
-```
+Audit records are append-oriented and must not be modified by ordinary product
+flows.
 
-instead of immediate deletion.
+# 9. Transactions and Constraints
 
-Hard delete only after retention policies are satisfied.
+Use transactions for operations that must commit atomically, including admin
+mutations, session revocation with user disablement, and durable project policy
+changes.
 
----
+Prefer database constraints for uniqueness, foreign keys, enumerated statuses,
+and nonnegative limits. Enforce the same rules in the application for clear
+errors.
 
-# 13. Index Strategy
+# 10. Invariants
 
-Every table should define indexes intentionally.
-
-Examples:
-
-Projects
-
-```text
-slug
-```
-
-Daily Statistics
-
-```text
-(project_id, date)
-```
-
-API Keys
-
-```text
-key_hash
-```
-
-Avoid unnecessary indexes.
-
-Every index increases write cost.
-
----
-
-# 14. JSONB Usage
-
-Use JSONB only for flexible configuration.
-
-Suitable:
-
-* Widget Config
-* Theme Config
-* Custom Metadata
-
-Avoid JSONB for:
-
-* Primary relationships
-* Frequently filtered fields
-* Analytics counters
-
----
-
-# 15. Migrations
-
-All schema changes must be versioned.
-
-Example:
-
-```text
-000002_create_projects.sql
-
-000003_create_api_keys.sql
-```
-
-Never edit historical migrations.
-
-Create new migrations instead.
-
-For migration sequencing and change discipline, see `MIGRATIONS.md`.
-
----
-
-# 16. Transactions
-
-Use transactions only when necessary.
-
-Examples:
-
-* Project creation
-* control-plane shadow updates
-* aggregate persistence
-
-Do not wrap long-running operations in a transaction.
-
----
-
-# 17. Constraints
-
-Prefer database constraints.
-
-Examples:
-
-* UNIQUE
-* FOREIGN KEY
-* CHECK
-
-Business rules should be enforced in both:
-
-* Application
-* Database
-
----
-
-# 18. Naming Convention
-
-Tables:
-
-plural
-
-```text
-projects
-
-daily_statistics
-
-api_keys
-```
-
-Columns:
-
-snake_case
-
-Primary Key:
-
-```text
-id
-```
-
-Foreign Keys:
-
-```text
-project_id
-```
-
----
-
-# 19. Archiving
-
-Historical statistics older than retention policies may be archived.
-
-Runtime analytics should never depend on archived data.
-
----
-
-# 20. Future Expansion
-
-Potential future tables:
-
-```text
-badges
-
-widgets
-
-timelines
-
-heatmaps
-
-public_dashboards
-
-audit_logs
-
-plugins
-
-project_sync_events
-
-project_limits
-```
-
-The existing schema should accommodate these additions without major redesign.
-
----
-
-# 21. Database Invariants
-
-The following rules are mandatory:
-
-1. PostgreSQL is never the hot path.
-2. Runtime analytics always flow through Redis first.
-3. Historical tables store aggregated data only.
-4. IDs are immutable.
-5. API keys are stored as hashes.
-6. Migrations are append-only.
-7. Shoply remains the source of truth for billing, tenancy, and lifecycle.
-8. SVGStat stores only the durable data it needs for runtime and history.
-9. Schema evolution must preserve backward compatibility where possible.
-
-These principles ensure the database remains reliable, scalable, and maintainable as SVGStat evolves.
+1. APay remains the source of tenancy, billing, and lifecycle truth.
+2. PostgreSQL is the durable source of SVGStat runtime and analytics truth.
+3. PostgreSQL is never the SVG rendering write path.
+4. Runtime analytics always flow through Redis first.
+5. Historical analytics remain aggregated.
+6. IDs are immutable and public identifiers are compatibility-sensitive.
+7. Credentials are hashed and revocable.
+8. Redis and memory remain replaceable runtime projections.
+9. Schema changes use append-only versioned migrations.

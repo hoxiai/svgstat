@@ -26,6 +26,7 @@ type User struct {
 	Email           string     `json:"email"`
 	Name            string     `json:"name"`
 	Status          string     `json:"status"`
+	Role            string     `json:"role"`
 	EmailVerifiedAt *time.Time `json:"emailVerifiedAt,omitempty"`
 	CreatedAt       time.Time  `json:"createdAt"`
 	UpdatedAt       time.Time  `json:"updatedAt"`
@@ -40,11 +41,25 @@ type Session struct {
 }
 
 type Manager struct {
-	db *pgxpool.Pool
+	db          *pgxpool.Pool
+	adminEmails map[string]struct{}
 }
 
-func NewManager(db *pgxpool.Pool) *Manager {
-	return &Manager{db: db}
+func NewManager(db *pgxpool.Pool, adminEmails []string) *Manager {
+	emails := make(map[string]struct{}, len(adminEmails))
+	for _, email := range adminEmails {
+		emails[email] = struct{}{}
+	}
+	return &Manager{db: db, adminEmails: emails}
+}
+
+func (m *Manager) BootstrapAdmins(ctx context.Context) error {
+	for email := range m.adminEmails {
+		if _, err := m.db.Exec(ctx, `UPDATE users SET role = 'admin', updated_at = NOW() WHERE email = $1`, email); err != nil {
+			return fmt.Errorf("failed to bootstrap admin %s: %w", email, err)
+		}
+	}
+	return nil
 }
 
 func (m *Manager) Register(ctx context.Context, email, password, name string) (*User, error) {
@@ -64,10 +79,14 @@ func (m *Manager) Register(ctx context.Context, email, password, name string) (*
 	userID := generateID()
 	now := time.Now()
 
+	role := "user"
+	if _, ok := m.adminEmails[email]; ok {
+		role = "admin"
+	}
 	_, err = m.db.Exec(ctx, `
-		INSERT INTO users (id, email, password_hash, name, status, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, 'active', $5, $5)
-	`, userID, email, string(passwordHash), name, now)
+		INSERT INTO users (id, email, password_hash, name, status, role, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, 'active', $5, $6, $6)
+	`, userID, email, string(passwordHash), name, role, now)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
@@ -77,6 +96,7 @@ func (m *Manager) Register(ctx context.Context, email, password, name string) (*
 		Email:     email,
 		Name:      name,
 		Status:    "active",
+		Role:      role,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}, nil
@@ -99,6 +119,9 @@ func (m *Manager) Login(ctx context.Context, email, password string) (*Session, 
 		log.Error().Err(err).Str("email", email).Msg("invalid password")
 		return nil, ErrInvalidCredentials
 	}
+	if _, err := m.db.Exec(ctx, `UPDATE users SET last_login_at = NOW() WHERE id = $1`, userID); err != nil {
+		return nil, fmt.Errorf("failed to update last login: %w", err)
+	}
 
 	session, err := m.CreateSession(ctx, userID)
 	if err != nil {
@@ -111,12 +134,13 @@ func (m *Manager) Login(ctx context.Context, email, password string) (*Session, 
 func (m *Manager) CreateSession(ctx context.Context, userID string) (*Session, error) {
 	sessionID := generateID()
 	token := generateToken()
+	tokenHash := hashToken(token)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
 
 	_, err := m.db.Exec(ctx, `
-		INSERT INTO sessions (id, user_id, token, expires_at, created_at)
-		VALUES ($1, $2, $3, $4, $4)
-	`, sessionID, userID, token, expiresAt)
+		INSERT INTO sessions (id, user_id, token, token_hash, expires_at, created_at)
+		VALUES ($1, $2, $3, $3, $4, $4)
+	`, sessionID, userID, tokenHash, expiresAt)
 	if err != nil {
 		return nil, err
 	}
@@ -135,17 +159,17 @@ func (m *Manager) ValidateSession(ctx context.Context, token string) (*User, err
 	var expiresAt time.Time
 
 	err := m.db.QueryRow(ctx, `
-		SELECT u.id, u.email, u.name, u.status, u.created_at, u.updated_at, s.expires_at
+		SELECT u.id, u.email, u.name, u.status, u.role, u.created_at, u.updated_at, s.expires_at
 		FROM users u
 		JOIN sessions s ON u.id = s.user_id
-		WHERE s.token = $1
-	`, token).Scan(&user.ID, &user.Email, &user.Name, &user.Status, &user.CreatedAt, &user.UpdatedAt, &expiresAt)
+		WHERE s.token_hash = $1 OR (s.token_hash IS NULL AND s.token = $2)
+	`, hashToken(token), token).Scan(&user.ID, &user.Email, &user.Name, &user.Status, &user.Role, &user.CreatedAt, &user.UpdatedAt, &expiresAt)
 	if err != nil {
 		return nil, ErrSessionExpired
 	}
 
 	if time.Now().After(expiresAt) {
-		_, _ = m.db.Exec(ctx, "DELETE FROM sessions WHERE token = $1", token)
+		_, _ = m.db.Exec(ctx, "DELETE FROM sessions WHERE token_hash = $1 OR (token_hash IS NULL AND token = $2)", hashToken(token), token)
 		return nil, ErrSessionExpired
 	}
 
@@ -157,16 +181,16 @@ func (m *Manager) ValidateSession(ctx context.Context, token string) (*User, err
 }
 
 func (m *Manager) Logout(ctx context.Context, token string) error {
-	_, err := m.db.Exec(ctx, "DELETE FROM sessions WHERE token = $1", token)
+	_, err := m.db.Exec(ctx, "DELETE FROM sessions WHERE token_hash = $1 OR (token_hash IS NULL AND token = $2)", hashToken(token), token)
 	return err
 }
 
 func (m *Manager) GetUser(ctx context.Context, userID string) (*User, error) {
 	var user User
 	err := m.db.QueryRow(ctx, `
-		SELECT id, email, name, status, created_at, updated_at
+		SELECT id, email, name, status, role, created_at, updated_at
 		FROM users WHERE id = $1
-	`, userID).Scan(&user.ID, &user.Email, &user.Name, &user.Status, &user.CreatedAt, &user.UpdatedAt)
+	`, userID).Scan(&user.ID, &user.Email, &user.Name, &user.Status, &user.Role, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		return nil, ErrUserNotFound
 	}
@@ -189,5 +213,10 @@ func generateToken() string {
 	b := make([]byte, 32)
 	rand.Read(b)
 	hash := sha256.Sum256(b)
+	return hex.EncodeToString(hash[:])
+}
+
+func hashToken(token string) string {
+	hash := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(hash[:])
 }

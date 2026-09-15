@@ -10,6 +10,21 @@ import (
 	"github.com/svgstat/svgstat/internal/config"
 )
 
+const rateLimitScript = `
+local current = redis.call('INCR', KEYS[1])
+if current == 1 then redis.call('PEXPIRE', KEYS[1], ARGV[1]) end
+local ttl = redis.call('PTTL', KEYS[1])
+return {current, ttl}
+`
+
+const reserveMemberScript = `
+if redis.call('SISMEMBER', KEYS[1], ARGV[1]) == 1 then return 1 end
+if redis.call('SCARD', KEYS[1]) >= tonumber(ARGV[2]) then return 0 end
+redis.call('SADD', KEYS[1], ARGV[1])
+redis.call('EXPIRE', KEYS[1], ARGV[3])
+return 1
+`
+
 type Cache struct {
 	client *redis.Client
 }
@@ -38,12 +53,62 @@ func (c *Cache) Close() error {
 	return c.client.Close()
 }
 
+func (c *Cache) Ping(ctx context.Context) error {
+	return c.client.Ping(ctx).Err()
+}
+
 func (c *Cache) Get(ctx context.Context, key string) (string, error) {
 	return c.client.Get(ctx, key).Result()
 }
 
 func (c *Cache) Set(ctx context.Context, key string, value interface{}, expiration time.Duration) error {
 	return c.client.Set(ctx, key, value, expiration).Err()
+}
+
+func (c *Cache) Delete(ctx context.Context, keys ...string) error {
+	return c.client.Del(ctx, keys...).Err()
+}
+
+func (c *Cache) Publish(ctx context.Context, channel, message string) error {
+	return c.client.Publish(ctx, channel, message).Err()
+}
+
+func (c *Cache) Subscribe(ctx context.Context, channel string, handler func(string)) error {
+	subscription := c.client.Subscribe(ctx, channel)
+	defer subscription.Close()
+	if _, err := subscription.Receive(ctx); err != nil {
+		return err
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case message, ok := <-subscription.Channel():
+			if !ok {
+				return nil
+			}
+			handler(message.Payload)
+		}
+	}
+}
+
+func (c *Cache) AllowRate(ctx context.Context, key string, limit int, window time.Duration) (bool, time.Duration, error) {
+	result, err := c.client.Eval(ctx, rateLimitScript, []string{key}, window.Milliseconds()).Int64Slice()
+	if err != nil {
+		return false, 0, err
+	}
+	if len(result) != 2 {
+		return false, 0, fmt.Errorf("unexpected rate limit response")
+	}
+	return result[0] <= int64(limit), time.Duration(result[1]) * time.Millisecond, nil
+}
+
+func (c *Cache) ReserveMember(ctx context.Context, key, member string, limit int, ttl time.Duration) (bool, error) {
+	if limit <= 0 {
+		return true, nil
+	}
+	result, err := c.client.Eval(ctx, reserveMemberScript, []string{key}, member, limit, int64(ttl.Seconds())).Int()
+	return result == 1, err
 }
 
 func (c *Cache) Increment(ctx context.Context, key string) (int64, error) {

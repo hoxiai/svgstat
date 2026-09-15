@@ -37,7 +37,7 @@ It combines presentation and analytics in one workflow:
 
 ### Live SVG Counters
 
-Publish visitor counts, downloads, stars, followers, and custom metrics as lightweight SVG counters that work anywhere Markdown or an `<img>` tag is supported.
+Publish SVG image request counts as lightweight counters that work anywhere Markdown or an `<img>` tag is supported. These counts represent image endpoint requests, not authoritative GitHub visitors, downloads, or stars.
 
 ### Brand-Ready SVG Badges
 
@@ -53,7 +53,7 @@ See what is actually happening behind every badge and counter through a focused 
 - Countries
 - Devices
 - Browsers
-- Recent visitor details
+- Anonymous visitor details (raw IP addresses are not stored)
 
 ### GitHub-Friendly Attribution
 
@@ -69,7 +69,7 @@ SVGStat also includes a shared no-signup badge node for quick public usage. Each
 - Shared free badge: `https://svgstat.com/svg/free/badge/visitor.svg?label=visitors&page_id=github.com/svgstat/demo`
 - Demo project slug: `demo`
 - Counter endpoint: `https://svgstat.com/svg/demo/counter/visits.svg?label=Visits&color=7c3aed&page_id=github.com/svgstat/demo`
-- Badge endpoint: `https://svgstat.com/svg/demo/badge/downloads.svg?label=Downloads&color=0ea5e9&style=flat&page_id=github.com/svgstat/demo`
+- Badge endpoint: `https://svgstat.com/svg/demo/badge/requests.svg?label=Requests&color=0ea5e9&style=flat&page_id=github.com/svgstat/demo`
 - Markdown embed:
 
 ```markdown
@@ -121,6 +121,8 @@ go run cmd/api/main.go
 
 - SPA: [http://localhost:8080](http://localhost:8080)
 - Health check: [http://localhost:8080/health](http://localhost:8080/health)
+- Readiness check: [http://localhost:8080/ready](http://localhost:8080/ready)
+- Prometheus metrics: [http://localhost:8080/metrics](http://localhost:8080/metrics)
 
 ### Optional: seed local test data
 
@@ -129,6 +131,48 @@ go run scripts/init_test_data.go
 ```
 
 ## API And Embed Examples
+
+### Website Analytics
+
+Add one script before `</head>` on a regular HTML site, WordPress theme, or SPA. Replace `my-project` with the project slug shown in the dashboard:
+
+```html
+<script defer src="https://svgstat.com/sdk.js" data-project="my-project"></script>
+```
+
+The SDK records the initial page view and automatically follows History API, back/forward, query-string, and hash route changes. It uses no cookies; an anonymous visitor identifier is kept in `sessionStorage`. Call `window.svgstatTrack('/virtual-page')` for custom virtual routes.
+
+With no extra code, delegated listeners also capture four practical behaviors on current and dynamically inserted elements: `outbound_click`, `file_download`, `contact_click`, and `form_submit`. Automatic URL details contain only hostname and pathname—never query strings or hashes. Contact events contain only `email` or `phone`, and form events never read field values or button text.
+
+The same automatic mode measures real-user LCP, INP, and CLS with the browser Performance Observer API, plus categorized JavaScript and resource-loading failures. The dashboard applies the standard Core Web Vitals thresholds and shows affected anonymous visitors. Error messages, promise values, stack traces, DOM selectors, and URL query/hash values are never collected. Error reporting is capped at 20 events per page load to contain failure storms; unsupported browsers are skipped safely.
+
+Add a declarative custom event when a business action needs a name or explicit dimensions:
+
+```html
+<button data-svgstat-event="signup">Sign up</button>
+<button data-svgstat-event="purchase" data-svgstat-value="99" data-svgstat-currency="CNY" data-svgstat-property-plan="pro">Buy</button>
+```
+
+Use `data-svgstat-ignore` on a container to exclude its behavior events. Add `data-auto-track="false"` to the SDK script to disable automatic behavior and quality monitoring while retaining page views and manual events. Values in `data-svgstat-property-*` are intentionally configured by your site and must not contain personal or sensitive data.
+
+Product actions and optional conversion value can also be sent from JavaScript:
+
+```js
+window.svgstat('event', 'signup')
+window.svgstat('event', 'purchase', { value: 99, currency: 'CNY' })
+```
+
+The dashboard can turn events into conversion goals and ordered funnels. It shows daily event trends and compares conversion or funnel completion by source, medium, campaign, page, device, and country. Conversion rate is daily anonymous converters divided by the matching daily anonymous audience, summed across the selected period. Source, medium, and campaign attribution use the session's first landing URL and referrer; raw event streams and long-lived identities are not stored.
+
+Visit quality reports add 30-minute sessions, bounce rate, pages per session, estimated engaged time, entry and exit pages, aggregated adjacent page flows, and first-touch channel/device comparisons. A bounce is a one-page session. Engaged time only sums intervals between page views, so SVGStat does not invent dwell time for single-page visits. Page flows are stored as aggregate edges rather than replayable visitor journeys.
+
+For installation checks, use test mode. Test traffic appears in the live debugger for 30 minutes but never changes production analytics:
+
+```html
+<script defer src="https://svgstat.com/sdk.js" data-project="my-project" data-mode="test"></script>
+```
+
+Website events are accepted by `POST /api/v1/collect`. Configure exact domains, wildcard subdomains such as `*.example.com`, or local development origins in the dashboard. An empty domain list allows any HTTP(S) origin for quick setup; restrict it before production.
 
 ### Counter SVG
 
@@ -151,7 +195,7 @@ GET /svg/{projectSlug}/badge/{name}.svg
 Example:
 
 ```text
-https://svgstat.com/svg/demo/badge/downloads.svg?label=Downloads&style=flat-square
+https://svgstat.com/svg/demo/badge/requests.svg?label=Requests&style=flat
 ```
 
 ### Project Statistics
@@ -159,6 +203,37 @@ https://svgstat.com/svg/demo/badge/downloads.svg?label=Downloads&style=flat-squa
 ```text
 GET /api/v1/projects/{id}/stats
 ```
+
+### Historical Trend
+
+```text
+GET /api/v1/projects/{id}/stats/trend?days=30
+```
+
+`days` accepts `7`, `30`, or `90`. The response includes continuous daily PV, UV, SVG request, and bot request series.
+
+### Realtime And Period Analysis
+
+```text
+GET /api/v1/projects/{id}/stats/realtime
+GET /api/v1/projects/{id}/analysis?days=30
+GET /api/v1/projects/{id}/session-quality?days=30
+GET /api/v1/projects/{id}/issues?days=30
+```
+
+Realtime statistics cover page views and unique visitors in the last 5 and 30 minutes. Period analysis compares the selected 7, 30, or 90 days with the immediately preceding period and returns page, referrer, country, device, browser, UTM source, medium, and campaign breakdowns. Session quality uses the same ranges and returns entry/exit pages, page flows, and channel quality. Period UV is the sum of daily unique visitors; page breakdowns omit query parameters to reduce sensitive-data exposure and high cardinality.
+
+The issue report turns those aggregates into prioritized actions without storing raw events or visitor journeys. To limit false positives, traffic-drop alerts require at least 100 previous-period page views; conversion alerts only evaluate configured goals with at least 50 previous-period visitors and 5 converters; Core Web Vitals require 20 current samples. Collection-stop alerts require prior traffic and at least two inactive days. JavaScript and resource alerts use the percentage of anonymous visitors affected, not raw error volume alone.
+
+### Installation Status
+
+```text
+GET /api/v1/projects/{id}/installation
+```
+
+Returns `pending` until SVGStat receives the project's first real website, counter, or badge request, then returns `installed` with the first and latest request timestamps.
+
+Dashboard previews append `preview=1`. Preview requests render the SVG without incrementing counters, recording analytics, or marking the project as installed. Use the generated URL without `preview=1` in public embeds.
 
 ### Authentication
 
@@ -216,6 +291,7 @@ internal/
   migrate/    # migration runner
   project/    # project data access
   renderer/   # shared SVG rendering
+  worker/     # analytics flush worker
 
 migrations/   # SQL migrations
 scripts/      # helper scripts
@@ -233,6 +309,29 @@ resource/     # static resources
 - go-redis `v9`
 - Alpine.js
 - UnoCSS Runtime
+
+## Admin Console
+
+The admin console provides platform overview, user activation controls, and project status/capability management without entering the SVG rendering hot path.
+
+1. Set the administrator email in `.env`:
+
+   ```text
+   ADMIN_EMAILS=admin@example.com
+   ```
+
+2. Run `make migrate-up` and restart the service. An existing account with that email is promoted automatically, or you can register it after configuring the environment.
+3. Open [http://localhost:8080/admin](http://localhost:8080/admin).
+
+User and project changes are written to `admin_audit_logs`. Disabling a user revokes all sessions immediately, while project changes refresh the runtime cache.
+
+## Production Safety
+
+- Set `HTTP_TRUSTED_PROXIES` to the proxy IP addresses or CIDRs allowed to provide `X-Forwarded-*` headers.
+- Session credentials are stored as SHA-256 hashes; migration `021` keeps legacy sessions valid until their normal expiry.
+- Redis provides cross-instance authentication and collection rate limits and broadcasts runtime project cache invalidations.
+- A PostgreSQL advisory lock ensures only one enabled Worker instance flushes each interval. Set `WORKER_ENABLED=false` where no Worker should run.
+- `ANALYTICS_MAX_DAILY_VISITORS` and `ANALYTICS_MAX_DIMENSION_VALUES` bound exact Redis data per project and day. Aggregate totals continue after a bound is reached.
 
 ## Roadmap
 

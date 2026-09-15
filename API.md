@@ -1,375 +1,116 @@
-# API.md
-
 # SVGStat API Design
 
-> This document defines the API surface of SVGStat.
->
-> It covers runtime SVG endpoints, analytics collection, dashboard queries, and
-> control-plane integration with APayShop and Shoply.
+> SVGStat exposes public runtime APIs, authenticated product APIs, admin APIs,
+> and APay integration APIs. These surfaces remain separate.
 
----
-
-# 1. API Philosophy
-
-SVGStat exposes APIs for two very different traffic classes:
-
-1. Runtime SVG traffic
-2. Control-plane and dashboard traffic
-
-These classes must remain separated.
-
-Runtime SVG endpoints are optimized for:
-
-* low latency
-* cacheability
-* stateless execution
-* high request volume
-
-Control-plane endpoints are optimized for:
-
-* project lifecycle management
-* configuration synchronization
-* historical queries
-* secure administrative access
-
-Never design a single endpoint that tries to serve both roles.
-
----
-
-# 2. System Context
-
-SVGStat is the runtime engine in a three-repository system:
-
-* `Shoply` is the SaaS base for billing, tenancy, subscription state, and project provisioning.
-* `APayShop` is the public website, pricing portal, and user account center.
-* `SVGStat` serves the actual SVG URLs and collects runtime analytics.
-
-API consequences:
-
-* APayShop may initiate purchase and user-facing entry flows.
-* Shoply is the source of truth for tenant/project lifecycle.
-* SVGStat should expose stable APIs for rendering, analytics, and project sync.
-* Neither APayShop nor Shoply should sit in the hot rendering path.
-
----
-
-# 3. API Categories
-
-## Runtime SVG
-
-Used by browsers, README renderers, Markdown renderers, and static websites.
-
-Examples:
-
-* counter SVG
-* badge SVG
-* widget SVG
-* chart SVG
-
-Expected properties:
-
-* GET only when possible
-* cache-friendly
-* no authentication round-trip to upstream systems
-* no PostgreSQL writes
-
----
-
-## Analytics Ingestion
-
-Used to record request metadata associated with SVG access.
-
-Expected properties:
-
-* lightweight
-* Redis-first
-* non-blocking
-* safe to call on every render request
-
----
-
-## Dashboard Query
-
-Used by APayShop user center or Shoply dashboard surfaces to query historical data.
-
-Expected properties:
-
-* authenticated
-* project-scoped
-* JSON responses
-* can read Redis and PostgreSQL
-
----
-
-## Control Plane
-
-Used by Shoply to provision or update projects inside SVGStat.
-
-Examples:
-
-* create project
-* rotate keys
-* update plan
-* disable project
-* sync theme/widget configuration
-
-These endpoints are not public embed endpoints.
-
----
-
-# 4. Endpoint Shape
-
-Suggested public surface:
+# 1. Public Runtime
 
 ```text
-GET  /svg/:projectSlug/counter/:name.svg
-GET  /svg/:projectSlug/badge/:name.svg
-GET  /svg/:projectSlug/widget/:name.svg
-GET  /svg/:projectSlug/chart/:name.svg
-
-POST /v1/track
-
-GET  /v1/projects/:projectId/overview
-GET  /v1/projects/:projectId/trends
-GET  /v1/projects/:projectId/referrers
-GET  /v1/projects/:projectId/countries
-GET  /v1/projects/:projectId/browsers
-GET  /v1/projects/:projectId/devices
-
-POST /internal/v1/projects/sync
-POST /internal/v1/projects/disable
-POST /internal/v1/projects/rotate-key
-POST /internal/v1/projects/refresh-cache
+GET  /svg/{projectSlug}/counter/{name}.svg
+GET  /svg/{projectSlug}/badge/{name}.svg
+GET  /sdk.js
+POST /api/v1/collect
 ```
 
-The exact path layout may evolve, but the separation between:
+Requirements:
 
-* `/svg/...`
-* `/v1/...`
-* `/internal/v1/...`
+* no external service dependency
+* no PostgreSQL writes during SVG rendering
+* project-aware validation and rate limiting
+* memory/Redis project resolution
+* Redis-first analytics
+* graceful degraded SVG response when possible
 
-should remain stable.
-
----
-
-# 5. Authentication Rules
-
-## Public Runtime Endpoints
-
-SVG embed endpoints should avoid interactive authentication.
-
-Allowed identification methods:
-
-* signed project token
-* public project slug with project-level access rules
-* cache-resolved project configuration
-
-Never call APayShop or Shoply synchronously during a hot SVG request to resolve identity.
-
----
-
-## Dashboard Endpoints
-
-Dashboard and management endpoints require authenticated callers.
-
-Allowed callers:
-
-* Shoply backend
-* APayShop backend acting on behalf of the signed-in user
-* internal services with machine credentials
-
-Rules:
-
-* every request must resolve a project
-* every request must enforce tenant isolation
-* no caller may access another tenant's project data
-
----
-
-## Internal Endpoints
-
-Internal endpoints must never rely on client-side trust.
-
-Use:
-
-* service-to-service signatures
-* API keys stored as hashes
-* allowlist or gateway protection when applicable
-
----
-
-# 6. Response Rules
-
-## SVG Endpoints
-
-Return:
-
-* `image/svg+xml`
-* deterministic SVG body
-* cache headers suitable for the endpoint type
-
-Do not return JSON from SVG endpoints except explicit debug-only or internal tooling endpoints.
-
----
-
-## JSON Endpoints
-
-All JSON APIs should use a consistent envelope.
-
-Suggested structure:
-
-```json
-{
-  "success": true,
-  "data": {},
-  "error": null,
-  "requestId": "..."
-}
-```
-
-Error responses should remain machine-readable and stable across endpoints.
-
-Suggested error structure:
-
-```json
-{
-  "success": false,
-  "data": null,
-  "error": {
-    "code": "project_not_found",
-    "message": "Project does not exist or is not available"
-  },
-  "requestId": "..."
-}
-```
-
----
-
-# 7. Project Isolation
-
-Every endpoint must resolve project scope first.
-
-Isolation applies to:
-
-* runtime counters
-* Redis keys
-* dashboard queries
-* cache entries
-* rate limits
-* API credentials
-
-Never derive authorization from user input alone without validating project ownership or key scope.
-
----
-
-# 8. Runtime Request Rules
-
-For `/svg/...` requests:
-
-* validate request parameters
-* resolve project from memory cache first
-* read counters from Redis or memory
-* render through templates
-* collect analytics asynchronously or through a lightweight Redis pipeline
-* return SVG
-
-Forbidden in hot path:
-
-* PostgreSQL writes
-* direct Shoply calls
-* direct APayShop calls
-* heavy joins
-* blocking background work
-
----
-
-# 9. Control-Plane Integration
-
-Shoply is the control-plane source of truth.
-
-Typical flow:
+# 2. Authentication
 
 ```text
-User purchases plan in APayShop
-        │
-        ▼
-APayShop notifies Shoply
-        │
-        ▼
-Shoply provisions or updates project
-        │
-        ▼
-Shoply calls SVGStat internal API
-        │
-        ▼
-SVGStat refreshes cached project config
+POST /api/v1/auth/register
+POST /api/v1/auth/login
+POST /api/v1/auth/logout
+GET  /api/v1/auth/me
 ```
 
-This keeps:
+Browser authentication uses an HttpOnly session cookie. State-changing cookie
+requests require same-origin CSRF validation. Integration credentials are a
+separate concern and must not reuse browser sessions.
 
-* billing in APayShop
-* lifecycle and tenancy in Shoply
-* runtime rendering in SVGStat
+# 3. User and Project APIs
 
----
+Authenticated project routes enforce ownership before accessing project data.
 
-# 10. Versioning
+```text
+GET    /api/v1/projects
+POST   /api/v1/projects
+GET    /api/v1/projects/{id}
+PUT    /api/v1/projects/{id}
+DELETE /api/v1/projects/{id}
+```
 
-Public JSON APIs should be versioned when contract stability matters.
+Project analytics, diagnostics, website tracking, goals, and funnels live under
+the same owned project resource.
 
-Recommended:
+# 4. Admin APIs
 
-* `/v1/...` for public and dashboard APIs
-* `/internal/v1/...` for service-to-service APIs
+Admin routes require an active SVGStat session and the `admin` role.
 
-SVG URL formats should change only with strong backward-compatibility reasons, because embed links are hard to migrate once published.
+```text
+GET   /api/v1/admin/overview
+GET   /api/v1/admin/users
+PATCH /api/v1/admin/users/{id}/status
+GET   /api/v1/admin/projects
+PATCH /api/v1/admin/projects/{id}/status
+PATCH /api/v1/admin/projects/{id}/capabilities
+```
 
----
+Privileged writes are transactional and auditable. Project eligibility changes
+refresh runtime cache after commit.
 
-# 11. Rate Limiting
+# 5. APay Integration APIs
 
-Rate limiting must be project-aware and endpoint-aware.
+APay lifecycle synchronization must use authenticated, versioned, idempotent
+contracts. SVGStat validates the event and stores a runtime-ready local
+projection; APay remains authoritative for tenancy, billing, and lifecycle.
 
-Examples:
+Synchronization failure may delay a business change but never joins the SVG
+render path. Payment-provider callbacks terminate in APay rather than in the
+SVGStat runtime API.
 
-* public SVG endpoints: high volume, low per-request cost
-* dashboard APIs: lower volume, heavier reads
-* internal sync APIs: low volume, privileged access
+# 6. Response Envelope
 
-A single global limit is not sufficient for a multi-tenant SVG platform.
+Successful JSON response:
 
----
+```json
+{"success": true, "data": {}}
+```
 
-# 12. Observability
+Error response:
 
-Every API should contribute structured telemetry.
+```json
+{"success": false, "error": "Human-readable error"}
+```
 
-Recommended labels:
+# 7. Security
 
-* request type
-* endpoint category
-* project id
-* cache hit or miss
-* render latency
-* Redis latency
-* response size
-* status code
+* validate and bound all public inputs
+* enforce project ownership on every authenticated project operation
+* require admin role for admin routes
+* hash persistent credentials
+* rate-limit authentication and public collection
+* trust proxy headers only from configured proxies
+* never log secrets or raw credentials
 
-Do not log secrets, raw API keys, or personally sensitive values into request logs.
+# 8. Versioning
 
----
+The `/api/v1` prefix protects authenticated and collection contracts. Public SVG
+URLs are compatibility-sensitive. Additive response fields are allowed;
+breaking changes require a new version or staged migration.
 
-# 13. API Invariants
+# 9. Invariants
 
-The following rules are mandatory:
-
-1. SVG endpoints stay stateless.
-2. Hot render paths never write PostgreSQL.
-3. Control-plane APIs stay separate from public embed APIs.
-4. Project isolation is enforced before data access.
-5. Shoply is the lifecycle source of truth.
-6. APayShop is a user-facing portal, not the SVG runtime.
-7. Error formats remain consistent.
-8. Backward compatibility matters for published SVG URLs.
-
-These rules protect SVGStat from coupling business control-plane logic into runtime rendering.
+1. APay is the source of tenancy, billing, and commercial lifecycle truth.
+2. SVGStat is the source of rendering, analytics, and local runtime truth.
+3. Public runtime APIs stay independent from dashboard, admin, and commerce.
+4. SVG rendering never writes PostgreSQL or calls an external service.
+5. Authenticated project APIs enforce access to the local project projection.
+6. Admin writes are transactional and audited.
+7. APay synchronization writes are authenticated and idempotent.

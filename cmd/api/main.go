@@ -32,12 +32,20 @@ func main() {
 
 	router := app.SetupRoutes()
 
+	workerCtx, stopWorker := context.WithCancel(context.Background())
+	workerDone := make(chan struct{})
+	go func() {
+		app.StartWorker(workerCtx)
+		close(workerDone)
+	}()
+
 	srv := &http.Server{
-		Addr:         cfg.HTTP.Addr,
-		Handler:      router,
-		ReadTimeout:  cfg.HTTP.ReadTimeout,
-		WriteTimeout: cfg.HTTP.WriteTimeout,
-		IdleTimeout:  cfg.HTTP.IdleTimeout,
+		Addr:              cfg.HTTP.Addr,
+		Handler:           router,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       cfg.HTTP.ReadTimeout,
+		WriteTimeout:      cfg.HTTP.WriteTimeout,
+		IdleTimeout:       cfg.HTTP.IdleTimeout,
 	}
 
 	go func() {
@@ -59,6 +67,11 @@ func main() {
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Fatal().Err(err).Msg("Server forced to shutdown")
 	}
+
+	// Stop the worker and wait for its final flush before the deferred
+	// app.Close() tears down the database pool and Redis client.
+	stopWorker()
+	<-workerDone
 
 	log.Info().Msg("Server exited")
 }

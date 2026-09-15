@@ -1,528 +1,128 @@
-# CONTRACTS.md
+# SVGStat Contracts
 
-# SVGStat Cross-System Contracts
+> This document defines stable boundaries between APay, SVGStat clients, and
+> internal modules. APay owns tenancy, billing, and lifecycle; SVGStat owns
+> rendering, analytics, and the runtime projections it serves.
 
-> This document defines the concrete integration contracts between APayShop,
-> Shoply, and SVGStat.
->
-> It focuses on request/response shapes, field ownership, idempotency rules, and
-> compatibility expectations.
+# 1. Contract Classes
 
----
+SVGStat exposes three distinct contract classes:
 
-# 1. Contract Purpose
+* public embed contracts for SVG and the website SDK
+* authenticated dashboard and admin contracts
+* APay lifecycle synchronization contracts
 
-Architecture documents explain who owns which responsibility.
+These contracts must remain separate because they have different latency,
+authentication, and failure requirements.
 
-This document explains:
+# 2. Public Runtime Contract
 
-* who calls whom
-* which fields must be transmitted
-* which system owns each field
-* how to keep requests idempotent
-* how to preserve backward compatibility
+Examples:
 
-These contracts are intended to guide the first implementation and future API evolution.
+```text
+GET /svg/{projectSlug}/counter/{name}.svg
+GET /svg/{projectSlug}/badge/{name}.svg
+GET /sdk.js
+POST /api/v1/collect
+```
 
----
+Rules:
 
-# 2. System Roles
+* never call an external service synchronously
+* never write PostgreSQL during SVG rendering
+* resolve runtime eligibility from memory or Redis
+* validate and bound every public input
+* degrade gracefully when analytics storage is unavailable
 
-## APayShop
+# 3. Dashboard Contract
 
-Acts as:
+Dashboard APIs use authenticated SVGStat sessions and enforce project ownership.
 
-* official website
-* pricing and purchase entry
-* user-facing account center
-* upstream commercial event initiator
+Examples:
 
----
+```text
+GET  /api/v1/projects
+GET  /api/v1/projects/{id}/stats
+PUT  /api/v1/projects/{id}/website
+POST /api/v1/projects/{id}/goals
+POST /api/v1/projects/{id}/funnels
+```
 
-## Shoply
+Every project-scoped operation must resolve the project by both project ID and
+authenticated user ID before reading or mutating data.
 
-Acts as:
+# 4. Admin Contract
 
-* tenant and project lifecycle source of truth
-* billing and entitlement source of truth
-* control-plane caller of SVGStat
+Admin APIs require both an active session and the `admin` role.
 
----
+State-changing operations must:
 
-## SVGStat
+* validate a narrow request shape
+* commit durable state transactionally
+* write an audit record
+* revoke sessions when disabling a user
+* refresh runtime cache when changing project eligibility
 
-Acts as:
+# 5. APay Synchronization Contract
 
-* runtime SVG execution plane
-* runtime analytics collector
-* holder of runtime-oriented synchronized project state
-
----
-
-# 3. Contract Rules
-
-All cross-system contracts should follow these rules:
-
-* use JSON for service-to-service payloads
-* use `camelCase` field naming
-* include explicit versioning
-* include idempotency information for mutation requests
-* keep field ownership unambiguous
-* never send billing truth from SVGStat upstream as if it were authoritative
-
----
-
-# 4. Envelope Format
-
-Recommended JSON response envelope:
+APay uses credentials separate from browser sessions. Every lifecycle event
+should carry:
 
 ```json
 {
-  "success": true,
-  "data": {},
-  "error": null,
-  "requestId": "req_01J..."
+  "eventId": "evt_01J...",
+  "eventType": "project.plan.updated",
+  "occurredAt": "2026-08-24T12:00:00Z",
+  "data": {}
 }
 ```
 
-Recommended JSON error envelope:
+Rules:
+
+* `eventId` is globally unique and safe to retry.
+* Requests are authenticated or signature-verified.
+* Event type and payload version are explicit.
+* SVGStat validates the contract and stores a runtime-ready projection.
+* APay remains authoritative for tenancy, billing, and lifecycle.
+* Processing outcome is auditable and replayable.
+
+# 6. Error Contract
+
+JSON APIs use a consistent envelope:
 
 ```json
 {
   "success": false,
-  "data": null,
-  "error": {
-    "code": "project_not_found",
-    "message": "Project does not exist"
-  },
-  "requestId": "req_01J..."
+  "error": "Human-readable error"
 }
 ```
 
-Rules:
-
-* `requestId` should be generated per request
-* `error.code` should be stable and machine-readable
-* `error.message` may evolve for clarity
-
----
-
-# 5. APayShop -> Shoply Contract
-
-Purpose:
-
-* communicate commercial events that may affect entitlement or lifecycle
-
-Recommended endpoint:
-
-```text
-POST /internal/v1/svgstat/orders/activated
-```
-
-Suggested request body:
-
-```json
-{
-  "version": "2026-06-26",
-  "eventId": "evt_01J123456789",
-  "eventType": "subscription.activated",
-  "occurredAt": "2026-06-26T10:30:00Z",
-  "source": "apayshop",
-  "user": {
-    "externalUserId": "usr_1001",
-    "email": "user@example.com"
-  },
-  "subscription": {
-    "planCode": "svgstat_pro",
-    "billingCycle": "monthly",
-    "status": "active",
-    "startedAt": "2026-06-26T10:30:00Z",
-    "renewAt": "2026-07-26T10:30:00Z"
-  },
-  "order": {
-    "orderId": "ord_202606260001",
-    "paymentProvider": "wechat",
-    "providerReference": "wx_abc123"
-  }
-}
-```
-
-Field ownership:
-
-* `planCode`, `billingCycle`, `status`, `renewAt` belong to Shoply after ingestion
-* `orderId` and payment metadata are event evidence, not long-term SVGStat runtime state
-
-Idempotency:
-
-* `eventId` must be unique for the commercial event
-* Shoply should treat repeated `eventId` submissions as safe retries
-
----
-
-# 6. Shoply -> SVGStat Project Sync Contract
-
-Purpose:
-
-* synchronize runtime-serving project state into SVGStat
-
-Recommended endpoint:
-
-```text
-POST /internal/v1/projects/sync
-```
-
-Suggested request body:
-
-```json
-{
-  "version": "2026-06-26",
-  "eventId": "evt_sync_01J123",
-  "syncType": "project.upsert",
-  "occurredAt": "2026-06-26T10:35:00Z",
-  "tenant": {
-    "tenantId": "tenant_001"
-  },
-  "project": {
-    "externalProjectId": "proj_shoply_001",
-    "slug": "acme-readme",
-    "name": "Acme README Analytics",
-    "status": "active",
-    "visibility": "public",
-    "publicToken": "pst_live_xxx",
-    "planCode": "svgstat_pro"
-  },
-  "runtimePolicy": {
-    "renderEnabled": true,
-    "badgeEnabled": true,
-    "widgetEnabled": true,
-    "chartEnabled": true,
-    "maxRequestsPerMinute": 600,
-    "cacheTtlSeconds": 60
-  },
-  "presentation": {
-    "defaultTheme": "dark",
-    "defaultLocale": "en"
-  }
-}
-```
-
-Expected response:
-
-```json
-{
-  "success": true,
-  "data": {
-    "accepted": true,
-    "projectId": "svgstat_proj_001",
-    "syncState": "updated"
-  },
-  "error": null,
-  "requestId": "req_01J..."
-}
-```
-
-Rules:
-
-* `externalProjectId` is the upstream project identifier from Shoply
-* `tenantId` is owned by Shoply
-* `publicToken` is runtime-facing synchronized state, not billing truth
-* SVGStat may transform this into local cache and local durable runtime records
-
-Idempotency:
-
-* `eventId` should deduplicate retries
-* repeated `project.upsert` with same payload should be safe
-
----
-
-# 7. Shoply -> SVGStat Project Disable Contract
-
-Purpose:
-
-* stop or restrict runtime-serving behavior for a project
-
-Recommended endpoint:
-
-```text
-POST /internal/v1/projects/disable
-```
-
-Suggested request body:
-
-```json
-{
-  "version": "2026-06-26",
-  "eventId": "evt_disable_01J123",
-  "syncType": "project.disable",
-  "occurredAt": "2026-06-26T10:40:00Z",
-  "tenant": {
-    "tenantId": "tenant_001"
-  },
-  "project": {
-    "externalProjectId": "proj_shoply_001",
-    "slug": "acme-readme",
-    "status": "disabled"
-  },
-  "reason": {
-    "code": "subscription_expired",
-    "message": "Subscription expired and grace period ended"
-  }
-}
-```
-
-Expected behavior:
-
-* mark local runtime state as disabled
-* evict or refresh runtime cache
-* future public render requests respond according to policy
-
-Possible render outcomes:
-
-* deny rendering
-* render fallback badge
-* render disabled state SVG
-
-That policy should be consistent per plan and product decision.
-
----
-
-# 8. Shoply -> SVGStat Key Rotation Contract
-
-Purpose:
-
-* rotate runtime-facing access credentials without forcing manual database edits
-
-Recommended endpoint:
-
-```text
-POST /internal/v1/projects/rotate-key
-```
-
-Suggested request body:
-
-```json
-{
-  "version": "2026-06-26",
-  "eventId": "evt_rotate_01J123",
-  "occurredAt": "2026-06-26T10:45:00Z",
-  "project": {
-    "externalProjectId": "proj_shoply_001"
-  },
-  "key": {
-    "name": "publicRuntimeKey",
-    "keyId": "key_001",
-    "keyHash": "sha256:abcdef123456",
-    "expiresAt": "2026-12-31T23:59:59Z"
-  }
-}
-```
-
-Rules:
-
-* plaintext keys should not be stored durably in SVGStat
-* `keyHash` should be the stored value
-* retries with same `eventId` must remain safe
-
----
-
-# 9. SVGStat Dashboard Query Contract
-
-Purpose:
-
-* provide historical analytics to APayShop or Shoply surfaces
-
-Recommended endpoint:
-
-```text
-GET /v1/projects/:projectId/overview
-```
-
-Example response:
-
-```json
-{
-  "success": true,
-  "data": {
-    "projectId": "svgstat_proj_001",
-    "today": {
-      "pv": 1203,
-      "uv": 488,
-      "requests": 1401,
-      "bots": 91
-    },
-    "last7Days": {
-      "pv": 8412,
-      "uv": 3204
-    },
-    "topReferrers": [
-      {
-        "name": "github.com",
-        "count": 502
-      }
-    ],
-    "topCountries": [
-      {
-        "name": "US",
-        "count": 430
-      }
-    ]
-  },
-  "error": null,
-  "requestId": "req_01J..."
-}
-```
-
-Rules:
-
-* caller auth is required
-* query must be project-scoped
-* near-real-time fields may read Redis
-* historical fields may read PostgreSQL
-
----
-
-# 10. Public SVG URL Contract
-
-Purpose:
-
-* provide a stable embed URL that developers can place into README files and websites
-
-Recommended shape:
-
-```text
-GET /svg/:projectSlug/counter/:name.svg?label=Visitors&style=flat&theme=dark
-```
-
-Supported parameter classes:
-
-* `label`
-* `style`
-* `theme`
-* `locale`
-* `format`
-* `token`
-
-Rules:
-
-* URLs should remain backward compatible once public
-* query parameters must be validated and sanitized
-* `token` should be optional only for explicitly public projects
-* SVG endpoints return `image/svg+xml`, not JSON
-
-Example:
-
-```text
-/svg/acme-readme/counter/visitors.svg?label=Visitors&theme=dark
-```
-
----
-
-# 11. Tracking Contract
-
-Purpose:
-
-* optionally accept explicit analytics ingestion outside automatic render-path collection
-
-Recommended endpoint:
-
-```text
-POST /v1/track
-```
-
-Suggested request body:
-
-```json
-{
-  "version": "2026-06-26",
-  "project": {
-    "projectId": "svgstat_proj_001"
-  },
-  "event": {
-    "type": "render",
-    "resourceType": "counter",
-    "resourceName": "visitors"
-  },
-  "request": {
-    "referrer": "https://github.com/acme/repo",
-    "userAgent": "Mozilla/5.0 ...",
-    "country": "US",
-    "device": "desktop",
-    "browser": "Chrome"
-  }
-}
-```
-
-Rules:
-
-* avoid duplicating automatic render-path counting unless explicitly intended
-* normalize labels before storage
-* do not accept unbounded arbitrary payloads
-
----
-
-# 12. Status Vocabulary
-
-Recommended project statuses:
-
-* `pending`
-* `active`
-* `grace`
-* `disabled`
-* `archived`
-
-Recommended sync types:
-
-* `project.upsert`
-* `project.disable`
-* `project.rotateKey`
-* `project.refreshCache`
-
-Recommended commercial event types:
-
-* `subscription.activated`
-* `subscription.renewed`
-* `subscription.upgraded`
-* `subscription.cancelled`
-* `subscription.expired`
-
-These values should be treated as contract enums once implementation begins.
-
----
-
-# 13. Compatibility Rules
-
-Contracts should evolve with discipline.
-
-Allowed:
-
-* add optional fields
-* add new event types
-* add new response fields
-
-Use caution:
-
-* changing status semantics
-* renaming public fields
-* changing SVG URL shape
-
-Avoid without version bump:
-
-* removing required fields
-* changing field meaning
-* changing auth requirements incompatibly
-
----
-
-# 14. Contract Invariants
-
-The following rules are mandatory:
-
-1. APayShop emits commercial events; it is not the lifecycle source of truth.
-2. Shoply syncs runtime-serving project state into SVGStat.
-3. SVGStat stores derived runtime state and historical analytics, not billing truth.
-4. Every mutation request includes a version and idempotency event identifier.
-5. Public SVG URLs are treated as long-lived public contracts.
-6. Service-to-service contracts use stable machine-readable error codes.
-7. Field ownership stays explicit across all payloads.
-
-These rules keep the three-system platform interoperable and safe to evolve.
+Expected status codes:
+
+* `400` invalid input
+* `401` unauthenticated
+* `403` unauthorized or runtime-disabled
+* `404` missing resource
+* `409` invalid state transition
+* `429` rate limited
+* `500` internal failure
+* `503` temporary dependency failure
+
+# 7. Versioning
+
+Backward-compatible fields may be added without a new API version. Breaking
+changes require a new explicit version or a staged migration.
+
+Public SVG URLs and project slugs are compatibility-sensitive and must not be
+changed casually.
+
+# 8. Invariants
+
+1. APay owns tenancy, billing, and commercial lifecycle truth.
+2. SVGStat owns rendering, analytics, and local runtime truth.
+3. Public runtime, dashboard, admin, and integration contracts remain separate.
+4. Public rendering never depends on APay or another external service.
+5. Authenticated project operations enforce local access.
+6. Admin mutations are transactional and auditable.
+7. APay synchronization is authenticated and idempotent.
+8. Contract changes preserve compatibility or introduce explicit versioning.

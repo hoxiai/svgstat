@@ -1,313 +1,113 @@
-# INTEGRATION.md
+# SVGStat APay Integration
 
-# SVGStat Cross-System Integration
+> This document defines how APay synchronizes commercial lifecycle state into
+> SVGStat without entering the SVG rendering hot path.
 
-> This document defines how SVGStat integrates with APayShop and Shoply.
->
-> The goal is to keep billing, tenant lifecycle, and runtime SVG serving
-> strictly separated while still forming one coherent SaaS product.
+# 1. Ownership
 
----
+APay is the authoritative owner of:
 
-# 1. System Roles
+* official website and user portal
+* tenancy and account-center identity
+* billing, subscriptions, and purchase history
+* commercial project lifecycle and plan entitlements
 
-The full product is split across three repositories:
+SVGStat is the authoritative owner of:
 
-## APayShop
+* rendering configuration
+* runtime and historical analytics
+* local runtime projections and cache state
+* operational administration and audit history
 
-Responsible for:
+Local dashboard identities and project access records support SVGStat operation;
+they do not replace APay's tenant, billing, or lifecycle records.
 
-* official website
-* pricing pages
-* marketing entry
-* user-facing account center
-* purchase and renewal entry
+# 2. Integration Principle
 
-APayShop is the customer-facing commercial portal.
-
-It should not serve production SVG rendering traffic.
-
----
-
-## Shoply
-
-Responsible for:
-
-* tenant lifecycle
-* project provisioning
-* subscription state
-* billing truth
-* entitlement checks
-* API and admin control-plane workflows
-
-Shoply is the control-plane source of truth.
-
-It should not join the hot SVG request path.
-
----
-
-## SVGStat
-
-Responsible for:
-
-* final SVG URLs
-* runtime rendering
-* runtime analytics
-* Redis-first counters
-* historical analytics aggregation
-* runtime-oriented project config cache
-
-SVGStat is the execution plane for developer-facing SVG embeds.
-
----
-
-# 2. Why This Split Exists
-
-Each system optimizes for a different type of work:
-
-* APayShop optimizes for conversion and account experience.
-* Shoply optimizes for SaaS lifecycle and operational control.
-* SVGStat optimizes for low-latency stateless rendering.
-
-Trying to merge these into one runtime path would create:
-
-* slower renders
-* weaker boundaries
-* billing logic leaking into embed traffic
-* harder scalability
-
----
-
-# 3. High-Level Data Ownership
-
-## APayShop Owns
-
-Examples:
-
-* pricing display state
-* purchase UI state
-* account-center interaction state
-* website-facing session and presentation context
-
----
-
-## Shoply Owns
-
-Examples:
-
-* tenant identity
-* project lifecycle state
-* billing and entitlement truth
-* subscription activation
-* team and user ownership relationships
-* control-plane API credentials and provisioning workflow
-
----
-
-## SVGStat Owns
-
-Examples:
-
-* runtime counters
-* daily historical aggregates
-* rendering configuration snapshots needed for runtime
-* widget rendering settings
-* SVG-facing project cache and access metadata
-
-SVGStat may keep local copies of control-plane fields required for runtime, but those copies are derived state, not authoritative truth.
-
----
-
-# 4. Core Integration Principle
-
-The most important system rule is:
+APay uses explicit, authenticated APIs or verified webhooks. It never
+participates synchronously in SVG rendering.
 
 ```text
-Billing and lifecycle move downstream into SVGStat through explicit sync.
-They are never resolved synchronously during hot SVG rendering.
+APay lifecycle event
+        │
+        ▼
+Authenticated SVGStat API
+        │
+        ▼
+PostgreSQL runtime projection
+        │
+        ▼
+Runtime cache refresh
 ```
 
-This means:
-
-* APayShop does not call SVGStat during checkout to render entitlement decisions.
-* SVGStat does not call Shoply on every badge or counter request.
-* Shoply pushes or synchronizes state into SVGStat ahead of runtime traffic.
-
----
-
-# 5. Primary Business Flow
-
-Recommended purchase and provisioning flow:
+The render flow remains independent:
 
 ```text
-User visits APayShop
-    │
-    ▼
-User purchases or renews plan
-    │
-    ▼
-APayShop confirms payment
-    │
-    ▼
-APayShop notifies Shoply
-    │
-    ▼
-Shoply creates or updates tenant/project entitlement
-    │
-    ▼
-Shoply calls SVGStat internal sync API
-    │
-    ▼
-SVGStat refreshes runtime config and cache
-    │
-    ▼
-User receives or continues using SVG URLs
+Embed request -> memory cache -> Redis -> renderer -> SVG response
 ```
 
-This keeps the commercial process and the rendering process decoupled.
+# 3. Purchase and Lifecycle Flow
 
----
-
-# 6. Runtime Render Flow
-
-The runtime SVG flow should look like this:
+A purchase flow completes in APay. APay then delivers the resulting entitlement
+or lifecycle change through a verified and idempotent callback.
 
 ```text
-Embed client requests SVG URL
-    │
-    ▼
-Cloudflare or edge cache
-    │
-    ▼
-SVGStat resolves project from memory or Redis
-    │
-    ▼
-SVGStat reads hot metrics
-    │
-    ▼
-SVGStat renders template
-    │
-    ▼
-SVGStat collects analytics through Redis pipeline
-    │
-    ▼
-SVG response returned
+User completes purchase in APay
+        │
+        ▼
+APay commits billing and lifecycle truth
+        │
+        ▼
+APay sends a signed synchronization event
+        │
+        ▼
+SVGStat updates its local runtime projection
+        │
+        ▼
+SVGStat refreshes runtime eligibility cache
 ```
-
-Forbidden in this flow:
-
-* synchronous APayShop calls
-* synchronous Shoply calls
-* PostgreSQL writes
-* provisioning logic
-* payment logic
-
----
-
-# 7. Sync Directions
-
-## APayShop -> Shoply
-
-Use when commercial state changes.
-
-Examples:
-
-* initial purchase success
-* renewal success
-* upgrade or downgrade intent
-* cancellation or expiration notifications
-
-APayShop should not directly become the lifecycle source of truth for SVGStat projects.
-
----
-
-## Shoply -> SVGStat
-
-Use when runtime-serving state must change.
-
-Examples:
-
-* create project
-* activate project
-* disable project
-* rotate public key or token
-* update plan-derived render limits
-* update widget or theme config snapshot
-
-This is the most important integration direction for runtime correctness.
-
----
-
-# 8. Local Shadow State in SVGStat
-
-SVGStat may persist local shadow fields for runtime use, such as:
-
-* project status
-* public slug
-* render eligibility flags
-* limits relevant to widget or badge output
-* public-facing configuration snapshot
 
 Rules:
 
-* local copies must be refreshable
-* local copies must not become independent sources of truth
-* conflicts should resolve in favor of Shoply control-plane data
+* APay persists the authoritative commercial result.
+* SVGStat persists only the fields required for runtime decisions.
+* Synchronization retries must be idempotent.
+* APay availability must not affect existing SVG requests.
+* Raw payment payloads and secrets must not enter analytics keys.
 
----
+# 4. Authentication
 
-# 9. Failure Handling Across Systems
-
-Expected degraded behaviors:
-
-* APayShop unavailable -> purchases or portal flows affected, existing SVG embeds continue where cached/runtime state allows
-* Shoply unavailable -> provisioning and lifecycle updates delayed, existing hot render traffic should continue using synced state
-* SVGStat unavailable -> embed traffic fails even if billing and portal are healthy
-
-This is intentional.
-
-The runtime system should be able to survive temporary upstream control-plane outages after sync.
-
----
-
-# 10. Security Boundaries
-
-Cross-system communication must be explicit and authenticated.
+APay integration credentials must be separate from browser sessions.
 
 Recommended controls:
 
-* service-to-service signatures
-* hashed API credentials
-* narrow internal endpoints
-* allowlists or gateway protection
-* audit logging for privileged sync actions
+* hashed API keys or signed requests
+* explicit scopes
+* expiration and rotation
+* request timestamps and replay protection
+* per-client rate limits
+* audit records for state-changing operations
 
-Never trust front-end claims to mutate runtime project state directly inside SVGStat.
+Never expose internal integration credentials in browser code or SVG URLs.
 
----
+# 5. Failure Handling
 
-# 11. Schema Ownership Rule
+APay synchronization failure may delay a lifecycle or entitlement change. It
+must not break existing render traffic.
 
-A critical rule for future implementation:
+State-changing callbacks should support:
 
-* user, billing, and team truth belong to Shoply
-* website-facing account experience belongs to APayShop
-* runtime analytics and render persistence belong to SVGStat
+* stable event IDs
+* safe retries
+* explicit accepted, processed, rejected, and failed states
+* operational visibility and replay
 
-If SVGStat stores user, billing, or team data, it should only do so as a minimal derived reference required for runtime or dashboard projection, never as primary ownership.
+# 6. Invariants
 
----
-
-# 12. Integration Invariants
-
-The following rules are mandatory:
-
-1. APayShop is the commercial portal, not the runtime engine.
-2. Shoply is the lifecycle source of truth.
-3. SVGStat is the runtime execution plane for SVG embeds.
-4. Billing and provisioning never execute inside hot render requests.
-5. SVGStat consumes upstream state through explicit sync, not per-request dependency.
-6. Derived local state in SVGStat must remain overrideable by Shoply truth.
-7. Failure in APayShop or Shoply should degrade control-plane freshness before it breaks hot render traffic.
-
-These rules keep the overall architecture scalable, understandable, and safe to evolve.
+1. APay owns tenancy, billing, and commercial lifecycle truth.
+2. SVGStat owns rendering, analytics, and local runtime truth.
+3. APay communicates through authenticated contracts.
+4. APay calls never join the SVG hot path.
+5. State-changing callbacks are verified, idempotent, and auditable.
+6. PostgreSQL stores durable local projections; Redis stores hot copies.
+7. Integration outages degrade change freshness, not existing rendering.

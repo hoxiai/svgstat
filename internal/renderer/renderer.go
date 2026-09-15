@@ -175,7 +175,7 @@ func normalizeColor(raw string) string {
 	if hexColorPattern.MatchString(value) {
 		return "#" + value
 	}
-	return value
+	return ""
 }
 
 func prepareHomepage(raw string) string {
@@ -191,6 +191,9 @@ func prepareHomepage(raw string) string {
 		}
 	}
 	if err != nil || parsed.Host == "" {
+		return ""
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
 		return ""
 	}
 

@@ -31,8 +31,7 @@ Workers are not responsible for:
 
 In the broader platform:
 
-* `APayShop` handles the public-facing portal and purchase experience.
-* `Shoply` handles SaaS control-plane functions such as billing, tenant state, and project management.
+* `APay` handles the public-facing portal and purchase experience.
 * `SVGStat` workers convert runtime analytics into durable SVGStat history and keep runtime caches healthy.
 
 This means worker jobs should focus on SVGStat-owned runtime and historical concerns, not on SaaS billing workflows.
@@ -94,7 +93,7 @@ Preload hot project configuration or frequently requested templates.
 
 Examples:
 
-* newly provisioned projects from Shoply
+* newly provisioned projects from APay
 * recently updated widget configs
 * popular public counters
 
@@ -182,6 +181,8 @@ Lock rules:
 * locks must have TTL
 * lock acquisition failure should defer work instead of blocking the runtime path
 
+SVGStat uses a PostgreSQL advisory lock for the recurring analytics flush. Every API instance may start the Worker, but only the lock holder flushes that interval. Set `WORKER_ENABLED=false` on instances that should never run background work.
+
 ---
 
 # 9. Database Writes
@@ -207,17 +208,16 @@ Workers should not write:
 
 ---
 
-# 10. Coordination with Control Plane
+# 10. Coordination with APay
 
-Workers may respond to control-plane changes initiated upstream.
+Workers may respond to lifecycle changes synchronized from APay.
 
 Examples:
 
-* Shoply provisions a new project -> warm project config cache
-* Shoply disables a project -> expire runtime cache and stop future processing
-* APayShop plan purchase results in project activation via Shoply -> refresh project eligibility flags
 
-The authoritative state still comes from upstream systems. Workers only materialize it into runtime-ready form inside SVGStat.
+* APay plan purchase results in project activation -> refresh project eligibility flags
+
+The authoritative commercial state still comes from APay. Workers only materialize it into runtime-ready form inside SVGStat.
 
 ---
 
@@ -282,7 +282,7 @@ The following rules are mandatory:
 2. Workers own asynchronous aggregation and cleanup.
 3. Worker jobs are idempotent or explicitly deduplicated.
 4. Historical persistence writes aggregated data only.
-5. Control-plane changes may trigger cache refresh, not hot-path coupling.
+5. APay lifecycle changes may trigger cache refresh, not hot-path coupling.
 6. Failure delays analytics freshness but should not break rendering.
 
 These rules keep SVGStat correct without sacrificing latency.

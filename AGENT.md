@@ -52,16 +52,12 @@ Do not sacrifice architecture for short-term convenience.
 
 # 3. High-Level Architecture
 
-SVGStat is the runtime engine in a three-repository SaaS architecture.
+SVGStat is the runtime engine in a two-layer SaaS architecture.
 
 ```text
-APayShop (Official Site / User Portal)
+APay (Official Site / User Portal)
         │
         │ purchase and account entry
-        ▼
-Shoply (SaaS Base / Billing / Project Lifecycle)
-        │
-        │ control-plane sync
         ▼
 Go SVG Engine
         │
@@ -74,13 +70,13 @@ Go SVG Engine
 
 Responsibilities are intentionally separated.
 
-APayShop manages website-facing user entry and account-center experience.
+APay manages website-facing user entry and account-center experience.
 
-Shoply manages tenancy, billing, and lifecycle.
+APay manages tenancy, billing, and lifecycle.
 
 Go manages rendering and analytics.
 
-The hot rendering path must not depend on APayShop or Shoply availability.
+The hot rendering path must not depend on APay availability.
 
 ---
 
@@ -95,7 +91,7 @@ These principles should never be violated.
 * Business logic never belongs in HTTP handlers.
 * SVG output must come from templates.
 * Every package owns a single responsibility.
-* APayShop and Shoply never join the hot SVG path.
+* APay never joins the hot SVG path.
 
 If implementation conflicts with these principles, redesign the implementation.
 
@@ -311,7 +307,7 @@ PostgreSQL stores:
 
 It is not a real-time counter database.
 
-Lifecycle and billing truth stay in upstream systems such as Shoply, not inside SVGStat runtime storage.
+Lifecycle and billing truth stay in APay, not inside SVGStat runtime storage.
 
 Schema changes must be implemented through versioned migrations.
 
@@ -403,8 +399,8 @@ When generating code:
 * Do not access PostgreSQL in hot paths.
 * Keep modules loosely coupled.
 * Preserve single responsibility.
-* Do not pull APayShop or Shoply business workflows into runtime rendering code.
-* Treat local control-plane shadow state as derived data, not billing or tenant truth.
+* Do not pull APay business workflows into runtime rendering code.
+* Treat local APay lifecycle projections as derived data, not billing or tenant truth.
 
 If multiple designs are possible, choose the one that keeps the architecture simpler.
 

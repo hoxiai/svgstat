@@ -31,21 +31,20 @@ Redis is not responsible for:
 * append-only audit storage
 * historical reporting beyond the hot window
 
-Those belong to Shoply or PostgreSQL, depending on the domain.
+Those belong to APay or PostgreSQL, depending on the domain.
 
 ---
 
 # 2. System Context
 
-In the full three-system architecture:
+In the APay + SVGStat architecture:
 
-* `APayShop` sells plans and exposes the user-facing portal.
-* `Shoply` owns tenancy, subscription state, and project lifecycle.
+* `APay` sells plans and exposes the user-facing portal.
 * `SVGStat` owns runtime analytics and SVG rendering.
 
 Redis therefore stores runtime facts for SVGStat only.
 
-Do not turn Redis into a cross-system business database shared with APayShop or Shoply logic.
+Do not turn Redis into a cross-system business database shared with APay logic.
 
 ---
 
@@ -272,7 +271,7 @@ Typical TTL:
 
 * minutes to hours
 
-These keys should also support proactive refresh when Shoply pushes a project sync event.
+These keys should also support proactive refresh when APay pushes a project sync event.
 
 ---
 
@@ -288,10 +287,10 @@ Redis may cache project configuration needed for hot rendering:
 
 The source of truth for lifecycle remains outside Redis:
 
-* Shoply for tenancy and subscription state
+* APay for tenancy and subscription state
 * PostgreSQL for durable SVGStat project state if persisted locally
 
-Redis stores the hot copy, not the authoritative control-plane record.
+Redis stores the hot copy, not the authoritative APay lifecycle record.
 
 ---
 
@@ -378,5 +377,8 @@ The following rules are mandatory:
 5. Worker aggregation consumes Redis buckets asynchronously.
 6. Redis does not become the source of truth for SaaS billing or tenant ownership.
 7. Runtime data and business data remain separated.
+8. Runtime project invalidations are broadcast across instances.
+9. Exact visitor and segmentation sets remain within configured cardinality bounds.
+10. Authentication and collection rate limits are shared across instances.
 
 These rules protect SVGStat's performance and multi-tenant safety.

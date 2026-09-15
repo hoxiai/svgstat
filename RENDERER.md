@@ -33,13 +33,12 @@ The renderer is not responsible for:
 
 In the larger platform:
 
-* `APayShop` is the public website and user portal.
-* `Shoply` is the SaaS control plane for tenancy and billing.
+* `APay` is the public website and user portal.
 * `SVGStat` serves the final embed URL that developers place into README files, Markdown, and websites.
 
 The renderer is the final step of that runtime chain.
 
-Neither APayShop nor Shoply should participate synchronously once a hot SVG request reaches the renderer.
+Only SVGStat, should participate synchronously once a hot SVG request reaches the renderer.
 
 ---
 
@@ -202,8 +201,7 @@ Hot render inputs should come from:
 
 Hot render inputs should not come from:
 
-* synchronous Shoply calls
-* synchronous APayShop calls
+* synchronous APay calls
 * PostgreSQL writes
 * large historical scans
 
@@ -230,7 +228,7 @@ Never embed:
 
 * secrets
 * raw access tokens
-* upstream internal identifiers unless explicitly safe
+* APay internal identifiers unless explicitly safe
 
 ---
 
@@ -248,7 +246,7 @@ Cache design should respect correctness:
 
 * short TTL for rapidly changing counters
 * longer TTL for static badges or theme assets
-* explicit cache busting when Shoply updates project configuration
+* explicit cache busting when APay updates project configuration
 
 ---
 
@@ -304,7 +302,7 @@ The following rules are mandatory:
 2. Renderer never writes PostgreSQL.
 3. Renderer uses templates instead of ad hoc SVG string building.
 4. Renderer consumes normalized inputs only.
-5. Renderer never depends on APayShop or Shoply in hot path.
+5. Renderer never depends on APay in hot path.
 6. Renderer output is deterministic and safe to embed.
 7. Rendering failure should degrade gracefully where possible.
 
