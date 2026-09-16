@@ -10,9 +10,9 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/svgstat/svgstat/internal/config"
-	"github.com/svgstat/svgstat/internal/database"
-	"github.com/svgstat/svgstat/internal/migrate"
+	"github.com/hoxiai/svgstat/internal/config"
+	"github.com/hoxiai/svgstat/internal/database"
+	"github.com/hoxiai/svgstat/internal/migrate"
 )
 
 func main() {

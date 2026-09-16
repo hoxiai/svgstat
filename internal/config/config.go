@@ -95,7 +95,7 @@ func Load() *Config {
 			IdleTimeout:    getDurationEnv("HTTP_IDLE_TIMEOUT", 60*time.Second),
 			CookieSecure:     getBoolEnv("HTTP_COOKIE_SECURE", false),
 			TrustedProxies:   getCSVEnv("HTTP_TRUSTED_PROXIES"),
-			CSRFCheckEnabled: getBoolEnv("CSRF_CHECK_ENABLED", true),
+			CSRFCheckEnabled: getBoolEnv("CSRF_CHECK_ENABLED", false),
 		},
 		Postgres: PostgresConfig{
 			Host:     getEnv("PG_HOST", "localhost"),
