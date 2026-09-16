@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/mail"
 	"net/url"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -79,6 +80,30 @@ var spaTemplateFiles = []string{
 	"web/components/pages/DashboardProject.html",
 }
 
+func (a *App) getAssetVersion() string {
+	if v := os.Getenv("ASSET_VERSION"); v != "" {
+		return v
+	}
+	var latest int64
+	checkPaths := []string{
+		"web/static/js/app.js",
+		"web/static/css/style.css",
+		"../../web/static/js/app.js",
+		"../../web/static/css/style.css",
+	}
+	for _, p := range checkPaths {
+		if info, err := os.Stat(p); err == nil {
+			if t := info.ModTime().Unix(); t > latest {
+				latest = t
+			}
+		}
+	}
+	if latest > 0 {
+		return strconv.FormatInt(latest, 10)
+	}
+	return "1.0.0"
+}
+
 func (a *App) handleSPA(w http.ResponseWriter, r *http.Request) {
 	tmpl, err := template.ParseFiles(spaTemplateFiles...)
 	if err != nil {
@@ -87,7 +112,14 @@ func (a *App) handleSPA(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := tmpl.ExecuteTemplate(w, "spa.html", nil); err != nil {
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
+
+	data := map[string]interface{}{
+		"Version": a.getAssetVersion(),
+	}
+	if err := tmpl.ExecuteTemplate(w, "spa.html", data); err != nil {
 		log.Error().Err(err).Msg("Failed to execute SPA template")
 	}
 }

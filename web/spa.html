@@ -15,8 +15,8 @@
         })();
     </script>
     <script src="/static/vendor/unocss-runtime.js"></script>
-    <link rel="stylesheet" href="/static/css/style.css">
-    <script type="module" src="/static/js/app.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css?v={{ .Version }}">
+    <script type="module" src="/static/js/app.js?v={{ .Version }}"></script>
 </head>
 <body class="bg-gray-50 min-h-screen">
     <div id="app" x-cloak x-data="spaApp()">

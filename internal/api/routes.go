@@ -17,9 +17,9 @@ func (a *App) SetupRoutes() *mux.Router {
 	r.HandleFunc("/ready", a.handleReady).Methods("GET")
 	r.HandleFunc("/metrics", a.handleMetrics).Methods("GET")
 
-	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
+	r.PathPrefix("/static/").Handler(noCacheFileServer("web/static", "/static/"))
 	r.PathPrefix("/components/").Handler(http.StripPrefix("/components/", http.FileServer(http.Dir("web/components"))))
-	r.PathPrefix("/admin/static/").Handler(http.StripPrefix("/admin/static/", http.FileServer(http.Dir("web/admin/static"))))
+	r.PathPrefix("/admin/static/").Handler(noCacheFileServer("web/admin/static", "/admin/static/"))
 
 	api := r.PathPrefix("/api/v1").Subrouter()
 	api.Handle("/auth/register", a.authRateLimitMiddleware(http.HandlerFunc(a.handleRegister))).Methods("POST")
@@ -79,4 +79,12 @@ func (a *App) SetupRoutes() *mux.Router {
 	r.PathPrefix("/").HandlerFunc(a.handleSPA).Methods("GET")
 
 	return r
+}
+
+func noCacheFileServer(dir string, prefix string) http.Handler {
+	fs := http.StripPrefix(prefix, http.FileServer(http.Dir(dir)))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache")
+		fs.ServeHTTP(w, r)
+	})
 }

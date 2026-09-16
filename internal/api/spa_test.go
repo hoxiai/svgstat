@@ -40,7 +40,7 @@ func TestHandleSPARendersEmbeddedComponents(t *testing.T) {
 		`showCreateModal`,                                // from CreateProjectModal.html
 		`showCodeModal`,                                  // from ProjectDetailModal.html
 		`/static/vendor/unocss-runtime.js`,
-		`type="module" src="/static/js/app.js"`,
+		`type="module" src="/static/js/app.js?v=`,
 	}
 
 	for _, snippet := range expectedSnippets {
