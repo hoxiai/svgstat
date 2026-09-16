@@ -170,6 +170,51 @@ export function createFormatterMethods() {
             return limit ? entries.slice(0, limit) : entries;
         },
 
+        getPaginatedEntries(record, page = 1, pageSize = 8) {
+            const entries = this.getSortedEntries(record);
+            const start = Math.max(0, (page - 1) * pageSize);
+            return entries.slice(start, start + pageSize);
+        },
+
+        getPaginatedList(list, page = 1, pageSize = 8) {
+            if (!Array.isArray(list)) return [];
+            const start = Math.max(0, (page - 1) * pageSize);
+            return list.slice(start, start + pageSize);
+        },
+
+        getTotalPages(totalItems, pageSize = 8) {
+            if (!totalItems) return 1;
+            const count = typeof totalItems === 'number'
+                ? totalItems
+                : (Array.isArray(totalItems) ? totalItems.length : Object.keys(totalItems).length);
+            return Math.max(1, Math.ceil(count / pageSize));
+        },
+
+        getTotalCount(items) {
+            if (!items) return 0;
+            if (typeof items === 'number') return items;
+            if (Array.isArray(items)) return items.length;
+            return Object.keys(items).length;
+        },
+
+        changeBreakdownPage(key, delta, record, pageSize = 8) {
+            const current = this.breakdownPages[key] || 1;
+            const total = this.getTotalPages(record, pageSize);
+            const target = current + delta;
+            if (target >= 1 && target <= total) {
+                this.breakdownPages[key] = target;
+            }
+        },
+
+        changeListPage(pageProp, delta, list, pageSize = 8) {
+            const current = this[pageProp] || 1;
+            const total = this.getTotalPages(list, pageSize);
+            const target = current + delta;
+            if (target >= 1 && target <= total) {
+                this[pageProp] = target;
+            }
+        },
+
         getBarStyle(count, record) {
             const values = Object.values(record || {});
             const max = values.length ? Math.max(...values) : 0;

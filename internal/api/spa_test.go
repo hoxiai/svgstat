@@ -37,6 +37,11 @@ func TestHandleSPARendersEmbeddedComponents(t *testing.T) {
 		`currentPage === 'register'`,                     // from Register.html
 		`currentPage === 'dashboard'`,                    // from Dashboard.html
 		`currentPage === 'project-detail'`,               // from DashboardProject.html
+		`projectTab === 'overview'`,                      // from TabOverview.html
+		`projectTab === 'growth'`,                        // from TabGrowth.html
+		`projectTab === 'quality'`,                       // from TabQuality.html
+		`projectTab === 'visitors'`,                      // from TabVisitors.html
+		`projectTab === 'diagnostics'`,                   // from TabDiagnostics.html
 		`showCreateModal`,                                // from CreateProjectModal.html
 		`showCodeModal`,                                  // from ProjectDetailModal.html
 		`/static/vendor/unocss-runtime.js`,

@@ -231,20 +231,78 @@ export function createAnalyticsMethods() {
             this.loadingInstallation = false;
         },
 
+        setProjectTab(tab) {
+            if (!tab) return;
+            const validTabs = ['overview', 'growth', 'quality', 'visitors', 'diagnostics'];
+            const targetTab = validTabs.includes(tab) ? tab : 'overview';
+            this.projectTab = targetTab;
+            if (window.location.hash !== `#${targetTab}`) {
+                window.location.hash = targetTab;
+            }
+            if (this.selectedProject) {
+                this.loadTabAnalytics(this.selectedProject.id, targetTab);
+                if (targetTab === 'diagnostics') {
+                    this.startDiagnosticsPolling(this.selectedProject.id);
+                } else {
+                    this.stopDiagnosticsPolling();
+                }
+            }
+        },
+
+        loadTabAnalytics(projectId, tab = 'overview', isRefresh = false) {
+            if (!projectId) return;
+            this.loadInstallation(projectId);
+            this.loadRealtime(projectId);
+
+            if (tab === 'overview') {
+                this.loadStats(projectId, isRefresh);
+                this.loadTrend(projectId, isRefresh);
+                this.loadAnalysis(projectId, isRefresh);
+                this.loadIssues(projectId, isRefresh);
+            } else if (tab === 'growth') {
+                this.loadConversions(projectId);
+                this.loadAnalysis(projectId, isRefresh);
+            } else if (tab === 'quality') {
+                this.loadSessionQuality(projectId, isRefresh);
+                this.loadConversions(projectId);
+            } else if (tab === 'visitors') {
+                if (!this.visitorsPage.items || !this.visitorsPage.items.length) {
+                    this.loadVisitors(projectId, 1);
+                }
+            } else if (tab === 'diagnostics') {
+                this.loadDiagnostics(projectId);
+                this.loadStats(projectId, isRefresh);
+            }
+        },
+
         startDashboardAutoRefresh(projectId) {
             this.stopDashboardAutoRefresh();
             this.dashboardRefreshTimer = setInterval(() => {
                 if (this.currentPage !== 'project-detail' || this.selectedProject?.id !== projectId) return;
-                this.loadStats(projectId, true);
-                this.loadTrend(projectId, true);
                 this.loadRealtime(projectId);
-                this.loadAnalysis(projectId, true);
-                this.loadSessionQuality(projectId, true);
-                this.loadConversions(projectId);
-                this.loadIssues(projectId, true);
                 this.loadInstallation(projectId);
+                if (this.projectTab === 'overview') {
+                    this.loadStats(projectId, true);
+                    this.loadTrend(projectId, true);
+                    this.loadAnalysis(projectId, true);
+                    this.loadIssues(projectId, true);
+                } else if (this.projectTab === 'growth') {
+                    this.loadConversions(projectId);
+                    this.loadAnalysis(projectId, true);
+                } else if (this.projectTab === 'quality') {
+                    this.loadSessionQuality(projectId, true);
+                    this.loadConversions(projectId);
+                } else if (this.projectTab === 'diagnostics') {
+                    this.loadDiagnostics(projectId);
+                } else if (this.projectTab === 'visitors') {
+                    if (this.visitorsPage.page === 1 && !this.visitorFilters.path) {
+                        this.loadVisitors(projectId, 1);
+                    }
+                }
             }, 30000);
-            this.startDiagnosticsPolling(projectId);
+            if (this.projectTab === 'diagnostics') {
+                this.startDiagnosticsPolling(projectId);
+            }
         },
 
         stopDashboardAutoRefresh() {
@@ -255,11 +313,8 @@ export function createAnalyticsMethods() {
         setTrendDays(days) {
             if (this.trendDays === days || !this.selectedProject) return;
             this.trendDays = days;
-            this.loadTrend(this.selectedProject.id, true);
-            this.loadAnalysis(this.selectedProject.id, true);
-            this.loadSessionQuality(this.selectedProject.id, true);
-            this.loadConversions(this.selectedProject.id);
-            this.loadIssues(this.selectedProject.id, true);
+            const pid = this.selectedProject.id;
+            this.loadTabAnalytics(pid, this.projectTab, true);
         },
 
         applyVisitorFilters() {

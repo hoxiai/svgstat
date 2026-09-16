@@ -92,6 +92,23 @@ export function createDefaultVisitorFilters() {
     };
 }
 
+export function createDefaultBreakdownPages() {
+    return {
+        referrers: 1,
+        countries: 1,
+        paths: 1,
+        devices: 1,
+        browsers: 1,
+        sources: 1,
+        mediums: 1,
+        campaigns: 1,
+        ips: 1,
+        entrances: 1,
+        exits: 1,
+        flows: 1
+    };
+}
+
 export function createInitialState() {
     const lang = localStorage.getItem('svgstat-lang')
         || ((navigator.language || 'en').toLowerCase().startsWith('en') ? 'en' : 'zh');
@@ -138,6 +155,14 @@ export function createInitialState() {
         loadingDiagnostics: false,
         diagnosticsPollTimer: null,
         selectedEventName: '',
+        projectTab: 'overview',
+        breakdownPages: createDefaultBreakdownPages(),
+        diagnosticsPage: 1,
+        diagnosticsPageSize: 10,
+        eventsPage: 1,
+        eventsPageSize: 8,
+        sessionSegmentsPage: 1,
+        sessionSegmentsPageSize: 8,
         conversionDimension: 'source',
         funnelDimension: 'source',
         sessionQualityDimension: 'source',

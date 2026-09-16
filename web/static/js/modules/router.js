@@ -2,11 +2,22 @@ import {
     createEmptyInstallation,
     createEmptyProjectStats,
     createEmptyVisitorPage,
-    createDefaultVisitorFilters
+    createDefaultVisitorFilters,
+    createDefaultBreakdownPages
 } from './state.js';
 
 export function createRouterMethods() {
     return {
+        handleHashChange() {
+            if (this.currentPage !== 'project-detail' || !this.selectedProject) return;
+            const rawHash = window.location.hash.replace(/^#/, '');
+            const validTabs = ['overview', 'growth', 'quality', 'visitors', 'diagnostics'];
+            const targetTab = validTabs.includes(rawHash) ? rawHash : 'overview';
+            if (this.projectTab !== targetTab) {
+                this.setProjectTab(targetTab);
+            }
+        },
+
         parseRoute() {
             this.stopDashboardAutoRefresh();
             this.stopDiagnosticsPolling();
@@ -51,21 +62,21 @@ export function createRouterMethods() {
                 this.expandedVisitorId = null;
                 this.lastLoadedVisitorsRequestKey = '';
                 this.visitorFilters = createDefaultVisitorFilters();
+                this.breakdownPages = createDefaultBreakdownPages();
+                this.diagnosticsPage = 1;
+                this.eventsPage = 1;
+                this.sessionSegmentsPage = 1;
+
+                const rawHash = window.location.hash.replace(/^#/, '');
+                const validTabs = ['overview', 'growth', 'quality', 'visitors', 'diagnostics'];
+                this.projectTab = validTabs.includes(rawHash) ? rawHash : 'overview';
+
                 if (this.projects.length > 0) {
                     const project = this.projects.find(p => p.slug === slug);
                     if (project) {
                         this.selectedProject = project;
                         this.installation = createEmptyInstallation();
-                        this.loadStats(project.id);
-                        this.loadTrend(project.id);
-                        this.loadRealtime(project.id);
-                        this.loadAnalysis(project.id);
-                        this.loadSessionQuality(project.id);
-                        this.loadConversions(project.id);
-                        this.loadIssues(project.id);
-                        this.loadDiagnostics(project.id);
-                        this.loadVisitors(project.id, 1);
-                        this.loadInstallation(project.id);
+                        this.loadTabAnalytics(project.id, this.projectTab);
                         this.startDashboardAutoRefresh(project.id);
                     }
                 }

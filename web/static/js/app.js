@@ -28,6 +28,7 @@ export function spaApp() {
             document.documentElement.lang = this.lang;
             this.parseRoute();
             window.addEventListener('popstate', () => this.parseRoute());
+            window.addEventListener('hashchange', () => this.handleHashChange());
             this.checkAuth();
             if (this.currentPage === 'dashboard' || this.currentPage === 'project-detail') {
                 this.loadProjects();

@@ -16,16 +16,7 @@ export function createProjectMethods() {
                         if (project) {
                             this.selectedProject = project;
                             this.installation = createEmptyInstallation();
-                            this.loadStats(project.id);
-                            this.loadTrend(project.id);
-                            this.loadRealtime(project.id);
-                            this.loadAnalysis(project.id);
-                            this.loadSessionQuality(project.id);
-                            this.loadConversions(project.id);
-                            this.loadIssues(project.id);
-                            this.loadDiagnostics(project.id);
-                            this.loadVisitors(project.id, 1);
-                            this.loadInstallation(project.id);
+                            this.loadTabAnalytics(project.id, this.projectTab);
                             this.startDashboardAutoRefresh(project.id);
                         }
                     }

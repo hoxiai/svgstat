@@ -1,0 +1,120 @@
+<!-- ======================================================== -->
+<!-- TAB 5: 接入与诊断 (DIAGNOSTICS) -->
+<!-- ======================================================== -->
+<div x-show="projectTab === 'diagnostics'" class="space-y-6">
+    <!-- 接入与测试代码 -->
+    <div class="bg-white rounded-xl shadow-sm p-6 stat-card">
+        <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-5">
+            <div>
+                <h3 class="font-semibold text-gray-900" x-text="t('diagnosticsTitle')"></h3>
+                <p class="text-sm text-gray-500 mt-1" x-text="t('diagnosticsHint')"></p>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="rounded-full border px-3 py-1 text-xs font-medium" :class="getDiagnosticStatusClass()" x-text="t(`diagnostics_${diagnostics.status}`)"></span>
+                <button @click="loadDiagnostics(selectedProject.id)" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:text-purple-600" x-text="t('refresh')"></button>
+                <button @click="clearDiagnostics" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:text-red-600" x-text="t('clear')"></button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3 mb-5">
+            <div class="rounded-lg bg-green-50 p-3"><div class="text-2xl font-bold text-green-600" x-text="diagnostics.accepted"></div><div class="text-xs text-gray-500" x-text="t('acceptedEvents')"></div></div>
+            <div class="rounded-lg bg-red-50 p-3"><div class="text-2xl font-bold text-red-600" x-text="diagnostics.rejected"></div><div class="text-xs text-gray-500" x-text="t('rejectedEvents')"></div></div>
+            <div class="rounded-lg bg-blue-50 p-3"><div class="text-2xl font-bold text-blue-600" x-text="diagnostics.testEvents"></div><div class="text-xs text-gray-500" x-text="t('testEvents')"></div></div>
+        </div>
+
+        <div x-show="diagnostics.issues.length" class="space-y-2 mb-5">
+            <template x-for="issue in diagnostics.issues" :key="issue.code">
+                <div class="rounded-lg border px-4 py-3 text-sm" :class="issue.severity === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-amber-200 bg-amber-50 text-amber-700'" x-text="t(`diagnostic_${issue.code}`) || issue.message"></div>
+            </template>
+        </div>
+
+        <div class="rounded-xl border border-blue-100 bg-blue-50 p-4 mb-5">
+            <div class="flex items-center justify-between gap-3 mb-2">
+                <div>
+                    <div class="font-medium text-blue-900" x-text="t('testMode')"></div>
+                    <p class="text-xs text-blue-700 mt-1" x-text="t('testModeHint')"></p>
+                </div>
+                <button @click="copyText(getTestWebsiteSnippet())" class="rounded-lg bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700" x-text="t('copy')"></button>
+            </div>
+            <code class="block overflow-x-auto whitespace-nowrap rounded-lg bg-gray-900 p-3 text-xs text-gray-100" x-text="getTestWebsiteSnippet()"></code>
+        </div>
+
+        <!-- 诊断日志表格 (带分页) -->
+        <div class="flex items-center justify-between gap-2 mb-3">
+            <div class="text-xs uppercase text-gray-400 font-medium tracking-wide" x-text="lang === 'zh' ? '实时日志明细' : 'Live Event Logs'"></div>
+            <div class="flex items-center gap-1.5 text-xs text-gray-500" x-show="getTotalCount(diagnostics.entries) > diagnosticsPageSize">
+                <button @click="changeListPage('diagnosticsPage', -1, diagnostics.entries, diagnosticsPageSize)" :disabled="diagnosticsPage <= 1" class="p-1 rounded hover:bg-gray-100 disabled:opacity-30">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                </button>
+                <span x-text="`${diagnosticsPage} / ${getTotalPages(diagnostics.entries, diagnosticsPageSize)}`"></span>
+                <button @click="changeListPage('diagnosticsPage', 1, diagnostics.entries, diagnosticsPageSize)" :disabled="diagnosticsPage >= getTotalPages(diagnostics.entries, diagnosticsPageSize)" class="p-1 rounded hover:bg-gray-100 disabled:opacity-30">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="text-xs uppercase text-gray-400 border-b">
+                    <tr>
+                        <th class="text-left py-3 pr-3" x-text="t('time')"></th>
+                        <th class="text-left py-3 pr-3" x-text="t('status')"></th>
+                        <th class="text-left py-3 pr-3" x-text="t('eventName')"></th>
+                        <th class="text-left py-3 pr-3" x-text="t('page')"></th>
+                        <th class="text-left py-3 pr-3" x-text="t('attribution')"></th>
+                        <th class="text-left py-3" x-text="t('properties')"></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    <template x-for="(entry,index) in getPaginatedList(diagnostics.entries, diagnosticsPage, diagnosticsPageSize)" :key="`${entry.timestamp}-${index}`">
+                        <tr>
+                            <td class="py-3 pr-3 text-gray-500 whitespace-nowrap text-xs" x-text="formatDateTime(entry.timestamp)"></td>
+                            <td class="py-3 pr-3">
+                                <span class="text-xs font-medium" :class="entry.status === 'accepted' ? 'text-green-600' : 'text-red-600'" x-text="entry.mode === 'test' ? `${entry.status} · test` : entry.status"></span>
+                                <div x-show="entry.reason" class="text-xs text-red-400" x-text="entry.reason"></div>
+                            </td>
+                            <td class="py-3 pr-3 font-mono text-xs text-purple-700" x-text="getDiagnosticType(entry)"></td>
+                            <td class="py-3 pr-3 max-w-40 truncate text-xs" :title="entry.path" x-text="entry.path || '-'"></td>
+                            <td class="py-3 pr-3 text-xs text-gray-500" x-text="[entry.source,entry.medium,entry.campaign].filter(Boolean).join(' / ') || '-'"></td>
+                            <td class="py-3 text-xs font-mono text-gray-500" x-text="(entry.propertyKeys || []).join(', ') || '-'"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+            <p x-show="!diagnostics.entries.length" class="text-center text-gray-500 py-6 text-sm" x-text="t('noDiagnostics')"></p>
+        </div>
+    </div>
+
+    <!-- 高频异常 IP 排查 (带分页) -->
+    <div class="bg-white rounded-xl shadow-sm p-6 stat-card">
+        <div class="flex items-center justify-between gap-2 mb-4">
+            <div>
+                <h3 class="font-semibold text-gray-900" x-text="t('topIPs')"></h3>
+                <p class="text-xs text-gray-500 mt-0.5" x-text="lang === 'zh' ? '查看高频匿名访问来源，便于排查异常流量与爬虫' : 'Monitor high frequency anonymous sources to troubleshoot bot traffic'"></p>
+            </div>
+            <div class="flex items-center gap-1.5 text-xs text-gray-500" x-show="getTotalCount(projectStats.ips) > 8">
+                <button @click="changeBreakdownPage('ips', -1, projectStats.ips)" :disabled="(breakdownPages.ips || 1) <= 1" class="p-1 rounded hover:bg-gray-100 disabled:opacity-30">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                </button>
+                <span x-text="`${breakdownPages.ips || 1} / ${getTotalPages(projectStats.ips, 8)}`"></span>
+                <button @click="changeBreakdownPage('ips', 1, projectStats.ips)" :disabled="(breakdownPages.ips || 1) >= getTotalPages(projectStats.ips, 8)" class="p-1 rounded hover:bg-gray-100 disabled:opacity-30">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                </button>
+            </div>
+        </div>
+        <div class="space-y-3" x-show="getPaginatedEntries(projectStats.ips, breakdownPages.ips || 1, 8).length > 0">
+            <template x-for="entry in getPaginatedEntries(projectStats.ips, breakdownPages.ips || 1, 8)" :key="entry[0]">
+                <div class="flex items-center justify-between gap-4">
+                    <span class="text-gray-700 font-mono text-sm" x-text="entry[0]"></span>
+                    <div class="flex items-center space-x-2">
+                        <div class="w-32 bg-gray-200 rounded-full h-2">
+                            <div class="bg-cyan-500 h-2 rounded-full" :style="getBarStyle(entry[1], projectStats.ips)"></div>
+                        </div>
+                        <span class="text-sm text-gray-500 min-w-8 text-right font-medium" x-text="entry[1]"></span>
+                    </div>
+                </div>
+            </template>
+        </div>
+        <p x-show="getTotalCount(projectStats.ips) === 0" class="text-gray-500 text-center py-4 text-sm" x-text="t('noData')"></p>
+    </div>
+</div>

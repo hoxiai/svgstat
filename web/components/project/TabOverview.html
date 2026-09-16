@@ -1,0 +1,299 @@
+<!-- ======================================================== -->
+<!-- TAB 1: 流量总览 (OVERVIEW - 默认核心页面) -->
+<!-- ======================================================== -->
+<div x-show="projectTab === 'overview'" class="space-y-6">
+    <!-- 实时概览 -->
+    <div class="bg-white rounded-xl shadow-sm p-6 stat-card">
+        <div class="flex items-center justify-between gap-4 mb-4">
+            <div>
+                <h3 class="font-semibold text-gray-900" x-text="t('realtimeOverview')"></h3>
+                <p class="text-sm text-gray-500 mt-1" x-text="projectRealtime.lastSeenAt ? `${t('lastRequest')} ${formatDateTime(projectRealtime.lastSeenAt)}` : t('realtimeWaiting')"></p>
+            </div>
+            <span class="inline-flex items-center gap-2 text-sm text-green-700 font-medium">
+                <span class="h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse"></span>
+                <span x-text="t('live')"></span>
+            </span>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="rounded-lg bg-purple-50 p-4"><div class="text-3xl font-bold text-purple-600" x-text="projectRealtime.pv5 || 0"></div><div class="text-sm text-gray-600" x-text="t('pageviews5m')"></div></div>
+            <div class="rounded-lg bg-blue-50 p-4"><div class="text-3xl font-bold text-blue-600" x-text="projectRealtime.visitors5 || 0"></div><div class="text-sm text-gray-600" x-text="t('visitors5m')"></div></div>
+            <div class="rounded-lg bg-purple-50 p-4"><div class="text-3xl font-bold text-purple-600" x-text="projectRealtime.pv30 || 0"></div><div class="text-sm text-gray-600" x-text="t('pageviews30m')"></div></div>
+            <div class="rounded-lg bg-blue-50 p-4"><div class="text-3xl font-bold text-blue-600" x-text="projectRealtime.visitors30 || 0"></div><div class="text-sm text-gray-600" x-text="t('visitors30m')"></div></div>
+        </div>
+    </div>
+
+    <!-- 今日概览 -->
+    <div class="bg-white rounded-xl shadow-sm p-6 stat-card">
+        <div class="flex items-center justify-between gap-4 mb-4">
+            <h3 class="font-semibold text-gray-900" x-text="t('todayOverview')"></h3>
+            <div x-show="loadingStats" class="animate-spin w-5 h-5 border-2 border-purple-200 border-purple-600 rounded-full"></div>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4">
+                <div class="text-3xl font-bold text-purple-600" x-text="projectStats.pv || 0"></div>
+                <div class="text-sm text-gray-600" x-text="t('pv')"></div>
+            </div>
+            <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4">
+                <div class="text-3xl font-bold text-blue-600" x-text="projectStats.uv || 0"></div>
+                <div class="text-sm text-gray-600" x-text="t('uv')"></div>
+            </div>
+            <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4">
+                <div class="text-3xl font-bold text-green-600" x-text="projectStats.requests || 0"></div>
+                <div class="text-sm text-gray-600" x-text="t('totalRequests')"></div>
+            </div>
+            <div class="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-4">
+                <div class="text-3xl font-bold text-orange-600" x-text="projectStats.bots || 0"></div>
+                <div class="text-sm text-gray-600" x-text="t('bots')"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 流量趋势折线图 -->
+    <div class="bg-white rounded-xl shadow-sm p-6 stat-card">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div>
+                <h3 class="font-semibold text-gray-900" x-text="t('trafficTrend')"></h3>
+                <p class="text-sm text-gray-500 mt-1" x-text="projectTrend.startDate && projectTrend.endDate ? `${formatTrendDate(projectTrend.startDate)} – ${formatTrendDate(projectTrend.endDate)}` : t('trendLoading')"></p>
+            </div>
+            <div class="flex items-center gap-2">
+                <template x-for="days in [7, 30, 90]" :key="days">
+                    <button
+                        @click="setTrendDays(days)"
+                        class="rounded-lg border px-3 py-1.5 text-sm transition-colors"
+                        :class="trendDays === days ? 'border-purple-600 bg-purple-600 text-white font-medium' : 'border-gray-200 bg-white text-gray-600 hover:border-purple-300 hover:text-purple-600'"
+                        x-text="`${days}${t('daysShort')}`">
+                    </button>
+                </template>
+                <div x-show="loadingTrend" class="animate-spin w-5 h-5 border-2 border-purple-200 border-purple-600 rounded-full ml-2"></div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            <div class="rounded-lg bg-purple-50 p-3">
+                <div class="flex items-start justify-between gap-2"><div class="text-2xl font-bold text-purple-600" x-text="projectAnalysis.current.pv || 0"></div><span class="text-xs font-medium" :class="projectAnalysis.changes.pv == null ? 'text-gray-400' : (projectAnalysis.changes.pv >= 0 ? 'text-green-600' : 'text-red-600')" x-text="formatChange(projectAnalysis.changes.pv)"></span></div>
+                <div class="text-xs text-gray-500" x-text="t('trendPV')"></div>
+            </div>
+            <div class="rounded-lg bg-blue-50 p-3">
+                <div class="flex items-start justify-between gap-2"><div class="text-2xl font-bold text-blue-600" x-text="projectAnalysis.current.uv || 0"></div><span class="text-xs font-medium" :class="projectAnalysis.changes.uv == null ? 'text-gray-400' : (projectAnalysis.changes.uv >= 0 ? 'text-green-600' : 'text-red-600')" x-text="formatChange(projectAnalysis.changes.uv)"></span></div>
+                <div class="text-xs text-gray-500" x-text="t('trendUV')"></div>
+            </div>
+            <div class="rounded-lg bg-green-50 p-3">
+                <div class="flex items-start justify-between gap-2"><div class="text-2xl font-bold text-green-600" x-text="projectAnalysis.current.requests || 0"></div><span class="text-xs font-medium" :class="projectAnalysis.changes.requests == null ? 'text-gray-400' : (projectAnalysis.changes.requests >= 0 ? 'text-green-600' : 'text-red-600')" x-text="formatChange(projectAnalysis.changes.requests)"></span></div>
+                <div class="text-xs text-gray-500" x-text="t('trendRequests')"></div>
+            </div>
+            <div class="rounded-lg bg-orange-50 p-3">
+                <div class="flex items-start justify-between gap-2"><div class="text-2xl font-bold text-orange-600" x-text="projectAnalysis.current.bots || 0"></div><span class="text-xs font-medium" :class="projectAnalysis.changes.bots == null ? 'text-gray-400' : (projectAnalysis.changes.bots >= 0 ? 'text-green-600' : 'text-red-600')" x-text="formatChange(projectAnalysis.changes.bots)"></span></div>
+                <div class="text-xs text-gray-500" x-text="t('bots')"></div>
+            </div>
+        </div>
+        <p class="text-xs text-gray-400 mb-4" x-text="t('comparisonHint')"></p>
+
+        <div class="rounded-xl border border-gray-100 bg-gray-50 p-4 overflow-hidden">
+            <svg viewBox="0 0 1000 240" class="w-full h-60" preserveAspectRatio="none" role="img" :aria-label="t('trafficTrend')">
+                <line x1="0" y1="220" x2="1000" y2="220" stroke="#e5e7eb" stroke-width="2"></line>
+                <line x1="0" y1="110" x2="1000" y2="110" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="8 8"></line>
+                <polyline :points="getTrendPoints('requests')" fill="none" stroke="#22c55e" stroke-width="5" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"></polyline>
+                <polyline :points="getTrendPoints('pv')" fill="none" stroke="#9333ea" stroke-width="4" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"></polyline>
+                <polyline :points="getTrendPoints('uv')" fill="none" stroke="#2563eb" stroke-width="4" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"></polyline>
+            </svg>
+            <div class="flex items-center justify-between text-xs text-gray-400 mt-2">
+                <span x-text="formatTrendDate(projectTrend.startDate)"></span>
+                <div class="flex flex-wrap justify-center gap-4 text-gray-600">
+                    <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-purple-600"></span><span x-text="t('trendPV')"></span></span>
+                    <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span><span x-text="t('trendUV')"></span></span>
+                    <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-green-500"></span><span x-text="t('trendRequests')"></span></span>
+                </div>
+                <span x-text="formatTrendDate(projectTrend.endDate)"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 核心流量构成 (带分页) -->
+    <div class="grid md:grid-cols-2 gap-6">
+        <!-- Top Referrers -->
+        <div class="bg-white rounded-xl shadow-sm p-6 stat-card">
+            <div class="flex items-center justify-between gap-2 mb-4">
+                <h3 class="font-semibold text-gray-900" x-text="t('topReferrers')"></h3>
+                <div class="flex items-center gap-1.5 text-xs text-gray-500" x-show="getTotalCount(projectAnalysis.breakdowns.referrers) > 8">
+                    <button @click="changeBreakdownPage('referrers', -1, projectAnalysis.breakdowns.referrers)" :disabled="(breakdownPages.referrers || 1) <= 1" class="p-1 rounded hover:bg-gray-100 disabled:opacity-30">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                    </button>
+                    <span x-text="`${breakdownPages.referrers || 1} / ${getTotalPages(projectAnalysis.breakdowns.referrers, 8)}`"></span>
+                    <button @click="changeBreakdownPage('referrers', 1, projectAnalysis.breakdowns.referrers)" :disabled="(breakdownPages.referrers || 1) >= getTotalPages(projectAnalysis.breakdowns.referrers, 8)" class="p-1 rounded hover:bg-gray-100 disabled:opacity-30">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="space-y-3" x-show="getPaginatedEntries(projectAnalysis.breakdowns.referrers, breakdownPages.referrers || 1, 8).length > 0">
+                <template x-for="entry in getPaginatedEntries(projectAnalysis.breakdowns.referrers, breakdownPages.referrers || 1, 8)" :key="entry[0]">
+                    <div class="flex items-center justify-between gap-4">
+                        <span class="text-gray-700 truncate flex-1 text-sm" x-text="entry[0]"></span>
+                        <div class="flex items-center space-x-2 shrink-0">
+                            <div class="w-32 bg-gray-200 rounded-full h-2">
+                                <div class="bg-pink-500 h-2 rounded-full" :style="getBarStyle(entry[1], projectAnalysis.breakdowns.referrers)"></div>
+                            </div>
+                            <span class="text-sm text-gray-500 min-w-8 text-right font-medium" x-text="entry[1]"></span>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            <p x-show="getTotalCount(projectAnalysis.breakdowns.referrers) === 0" class="text-gray-500 text-center py-4 text-sm" x-text="t('referrerHint')"></p>
+        </div>
+
+        <!-- Top Pages -->
+        <div class="bg-white rounded-xl shadow-sm p-6 stat-card">
+            <div class="flex items-center justify-between gap-2 mb-4">
+                <h3 class="font-semibold text-gray-900" x-text="t('topPages')"></h3>
+                <div class="flex items-center gap-1.5 text-xs text-gray-500" x-show="getTotalCount(projectAnalysis.breakdowns.paths) > 8">
+                    <button @click="changeBreakdownPage('paths', -1, projectAnalysis.breakdowns.paths)" :disabled="(breakdownPages.paths || 1) <= 1" class="p-1 rounded hover:bg-gray-100 disabled:opacity-30">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                    </button>
+                    <span x-text="`${breakdownPages.paths || 1} / ${getTotalPages(projectAnalysis.breakdowns.paths, 8)}`"></span>
+                    <button @click="changeBreakdownPage('paths', 1, projectAnalysis.breakdowns.paths)" :disabled="(breakdownPages.paths || 1) >= getTotalPages(projectAnalysis.breakdowns.paths, 8)" class="p-1 rounded hover:bg-gray-100 disabled:opacity-30">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="space-y-3" x-show="getPaginatedEntries(projectAnalysis.breakdowns.paths, breakdownPages.paths || 1, 8).length > 0">
+                <template x-for="entry in getPaginatedEntries(projectAnalysis.breakdowns.paths, breakdownPages.paths || 1, 8)" :key="entry[0]">
+                    <div class="flex items-center justify-between gap-4">
+                        <span class="text-gray-700 truncate flex-1 text-sm" x-text="formatBadgePath(entry[0])" :title="entry[0]"></span>
+                        <div class="flex items-center space-x-2 shrink-0">
+                            <div class="w-32 bg-gray-200 rounded-full h-2">
+                                <div class="bg-blue-500 h-2 rounded-full" :style="getBarStyle(entry[1], projectAnalysis.breakdowns.paths)"></div>
+                            </div>
+                            <span class="text-sm text-gray-500 min-w-8 text-right font-medium" x-text="entry[1]"></span>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            <p x-show="getTotalCount(projectAnalysis.breakdowns.paths) === 0" class="text-gray-500 text-center py-4 text-sm" x-text="t('noData')"></p>
+        </div>
+
+        <!-- Top Countries -->
+        <div class="bg-white rounded-xl shadow-sm p-6 stat-card">
+            <div class="flex items-center justify-between gap-2 mb-4">
+                <h3 class="font-semibold text-gray-900" x-text="t('topCountries')"></h3>
+                <div class="flex items-center gap-1.5 text-xs text-gray-500" x-show="getTotalCount(projectAnalysis.breakdowns.countries) > 8">
+                    <button @click="changeBreakdownPage('countries', -1, projectAnalysis.breakdowns.countries)" :disabled="(breakdownPages.countries || 1) <= 1" class="p-1 rounded hover:bg-gray-100 disabled:opacity-30">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                    </button>
+                    <span x-text="`${breakdownPages.countries || 1} / ${getTotalPages(projectAnalysis.breakdowns.countries, 8)}`"></span>
+                    <button @click="changeBreakdownPage('countries', 1, projectAnalysis.breakdowns.countries)" :disabled="(breakdownPages.countries || 1) >= getTotalPages(projectAnalysis.breakdowns.countries, 8)" class="p-1 rounded hover:bg-gray-100 disabled:opacity-30">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="space-y-3" x-show="getPaginatedEntries(projectAnalysis.breakdowns.countries, breakdownPages.countries || 1, 8).length > 0">
+                <template x-for="entry in getPaginatedEntries(projectAnalysis.breakdowns.countries, breakdownPages.countries || 1, 8)" :key="entry[0]">
+                    <div class="flex items-center justify-between gap-4">
+                        <span class="text-gray-700 text-sm truncate flex-1" x-text="entry[0]"></span>
+                        <div class="flex items-center space-x-2 shrink-0">
+                            <div class="w-32 bg-gray-200 rounded-full h-2">
+                                <div class="bg-purple-500 h-2 rounded-full" :style="getBarStyle(entry[1], projectAnalysis.breakdowns.countries)"></div>
+                            </div>
+                            <span class="text-sm text-gray-500 min-w-8 text-right font-medium" x-text="entry[1]"></span>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            <p x-show="getTotalCount(projectAnalysis.breakdowns.countries) === 0" class="text-gray-500 text-center py-4 text-sm" x-text="t('noData')"></p>
+        </div>
+
+        <!-- Top Devices -->
+        <div class="bg-white rounded-xl shadow-sm p-6 stat-card">
+            <div class="flex items-center justify-between gap-2 mb-4">
+                <h3 class="font-semibold text-gray-900" x-text="t('topDevices')"></h3>
+                <div class="flex items-center gap-1.5 text-xs text-gray-500" x-show="getTotalCount(projectAnalysis.breakdowns.devices) > 8">
+                    <button @click="changeBreakdownPage('devices', -1, projectAnalysis.breakdowns.devices)" :disabled="(breakdownPages.devices || 1) <= 1" class="p-1 rounded hover:bg-gray-100 disabled:opacity-30">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                    </button>
+                    <span x-text="`${breakdownPages.devices || 1} / ${getTotalPages(projectAnalysis.breakdowns.devices, 8)}`"></span>
+                    <button @click="changeBreakdownPage('devices', 1, projectAnalysis.breakdowns.devices)" :disabled="(breakdownPages.devices || 1) >= getTotalPages(projectAnalysis.breakdowns.devices, 8)" class="p-1 rounded hover:bg-gray-100 disabled:opacity-30">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="space-y-3" x-show="getPaginatedEntries(projectAnalysis.breakdowns.devices, breakdownPages.devices || 1, 8).length > 0">
+                <template x-for="entry in getPaginatedEntries(projectAnalysis.breakdowns.devices, breakdownPages.devices || 1, 8)" :key="entry[0]">
+                    <div class="flex items-center justify-between gap-4">
+                        <span class="text-gray-700 text-sm truncate flex-1" x-text="entry[0]"></span>
+                        <div class="flex items-center space-x-2 shrink-0">
+                            <div class="w-32 bg-gray-200 rounded-full h-2">
+                                <div class="bg-green-500 h-2 rounded-full" :style="getBarStyle(entry[1], projectAnalysis.breakdowns.devices)"></div>
+                            </div>
+                            <span class="text-sm text-gray-500 min-w-8 text-right font-medium" x-text="entry[1]"></span>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            <p x-show="getTotalCount(projectAnalysis.breakdowns.devices) === 0" class="text-gray-500 text-center py-4 text-sm" x-text="t('noData')"></p>
+        </div>
+
+        <!-- Top Browsers -->
+        <div class="bg-white rounded-xl shadow-sm p-6 stat-card md:col-span-2">
+            <div class="flex items-center justify-between gap-2 mb-4">
+                <h3 class="font-semibold text-gray-900" x-text="t('topBrowsers')"></h3>
+                <div class="flex items-center gap-1.5 text-xs text-gray-500" x-show="getTotalCount(projectAnalysis.breakdowns.browsers) > 8">
+                    <button @click="changeBreakdownPage('browsers', -1, projectAnalysis.breakdowns.browsers)" :disabled="(breakdownPages.browsers || 1) <= 1" class="p-1 rounded hover:bg-gray-100 disabled:opacity-30">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                    </button>
+                    <span x-text="`${breakdownPages.browsers || 1} / ${getTotalPages(projectAnalysis.breakdowns.browsers, 8)}`"></span>
+                    <button @click="changeBreakdownPage('browsers', 1, projectAnalysis.breakdowns.browsers)" :disabled="(breakdownPages.browsers || 1) >= getTotalPages(projectAnalysis.breakdowns.browsers, 8)" class="p-1 rounded hover:bg-gray-100 disabled:opacity-30">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="grid sm:grid-cols-2 gap-x-8 gap-y-3" x-show="getPaginatedEntries(projectAnalysis.breakdowns.browsers, breakdownPages.browsers || 1, 8).length > 0">
+                <template x-for="entry in getPaginatedEntries(projectAnalysis.breakdowns.browsers, breakdownPages.browsers || 1, 8)" :key="entry[0]">
+                    <div class="flex items-center justify-between gap-4">
+                        <span class="text-gray-700 text-sm truncate flex-1" x-text="entry[0]"></span>
+                        <div class="flex items-center space-x-2 shrink-0">
+                            <div class="w-28 bg-gray-200 rounded-full h-2">
+                                <div class="bg-orange-500 h-2 rounded-full" :style="getBarStyle(entry[1], projectAnalysis.breakdowns.browsers)"></div>
+                            </div>
+                            <span class="text-sm text-gray-500 min-w-8 text-right font-medium" x-text="entry[1]"></span>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            <p x-show="getTotalCount(projectAnalysis.breakdowns.browsers) === 0" class="text-gray-500 text-center py-4 text-sm" x-text="t('noData')"></p>
+        </div>
+    </div>
+
+    <!-- 问题与健康建议 (Issue Center) -->
+    <div class="bg-white rounded-xl shadow-sm p-6 stat-card">
+        <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+            <div>
+                <h3 class="font-semibold text-gray-900" x-text="t('issueCenterTitle')"></h3>
+                <p class="text-sm text-gray-500 mt-1" x-text="t('issueCenterHint')"></p>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="rounded-full border px-3 py-1 text-xs font-medium" :class="getIssueStatusClass(issueReport.status)" x-text="t(`issueStatus_${issueReport.status}`)"></span>
+                <div x-show="loadingIssues" class="animate-spin w-5 h-5 border-2 border-purple-200 border-purple-600 rounded-full"></div>
+            </div>
+        </div>
+        <div x-show="issueReport.issues.length" class="mt-5 space-y-3">
+            <template x-for="issue in issueReport.issues" :key="`${issue.code}-${issue.subject}`">
+                <div class="rounded-xl border p-4" :class="getIssueClass(issue.severity)">
+                    <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2">
+                                <span class="rounded-full px-2 py-0.5 text-xs font-semibold uppercase" :class="issue.severity === 'critical' ? 'bg-red-600 text-white' : 'bg-amber-500 text-white'" x-text="t(`issueSeverity_${issue.severity}`)"></span>
+                                <h4 class="font-semibold text-gray-900" x-text="getIssueTitle(issue)"></h4>
+                            </div>
+                            <p class="mt-2 text-sm text-gray-700" x-text="getIssueAdvice(issue)"></p>
+                        </div>
+                        <div class="shrink-0 rounded-lg bg-white/70 px-3 py-2 text-right text-xs text-gray-500">
+                            <div><span x-text="t('issueCurrent')"></span>: <strong class="text-gray-900" x-text="formatIssueValue(issue, 'current')"></strong></div>
+                            <div><span x-text="t('issuePrevious')"></span>: <span x-text="formatIssueValue(issue, 'previous')"></span></div>
+                            <div x-show="issue.changePercent != null" class="mt-1 font-medium" :class="issue.changePercent < 0 ? 'text-red-600' : 'text-amber-600'" x-text="formatChange(issue.changePercent)"></div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+        <div x-show="!loadingIssues && issueReport.status === 'healthy'" class="mt-5 rounded-xl border border-green-100 bg-green-50 px-4 py-4 text-sm text-green-700" x-text="t('issueHealthyHint')"></div>
+        <div x-show="!loadingIssues && issueReport.status === 'insufficient_data'" class="mt-5 rounded-xl border border-blue-100 bg-blue-50 px-4 py-4 text-sm text-blue-700" x-text="t('issueInsufficientHint')"></div>
+    </div>
+</div>

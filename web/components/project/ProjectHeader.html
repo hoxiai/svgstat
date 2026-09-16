@@ -1,0 +1,78 @@
+<!-- Header Bar -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+        <button @click="navigate('/dashboard')" class="inline-flex items-center rounded-lg border border-purple-200 bg-white px-3.5 py-2 text-sm text-purple-600 hover:bg-purple-50 hover:border-purple-300 hover:text-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-200 transition-colors">
+            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+            <span x-text="t('backToProjects')"></span>
+        </button>
+        <div class="flex items-center gap-2">
+            <h2 class="text-xl font-bold text-gray-900" x-text="selectedProject?.name"></h2>
+            <span class="rounded-md bg-purple-50 px-2 py-0.5 text-xs font-mono text-purple-700 border border-purple-100" x-text="selectedProject?.slug"></span>
+        </div>
+    </div>
+    <div class="flex items-center gap-3">
+        <button @click="openCodeModal(selectedProject)" class="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 shadow-sm transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+            </svg>
+            <span x-text="lang === 'zh' ? '获取 SDK / 嵌入代码' : 'Get SDK / Embed Code'"></span>
+        </button>
+    </div>
+</div>
+
+<!-- Compact Installation Warning (Shown only if not installed) -->
+<div x-show="installation.status !== 'installed'" class="rounded-xl border border-amber-200 bg-amber-50 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+        <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-amber-600 shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        </span>
+        <div>
+            <div class="font-semibold text-amber-900" x-text="t('installationPending')"></div>
+            <div class="text-sm text-amber-700 mt-0.5" x-text="t('installationPendingHint')"></div>
+        </div>
+    </div>
+    <button @click="openCodeModal(selectedProject, true)" class="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 shrink-0" x-text="t('getCode')"></button>
+</div>
+
+<!-- Tab Navigation Bar -->
+<div class="flex items-center gap-1.5 p-1.5 bg-gray-100/90 rounded-xl border border-gray-200/80 overflow-x-auto shadow-xs">
+    <button
+        @click="setProjectTab('overview')"
+        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap"
+        :class="projectTab === 'overview' ? 'bg-white text-purple-700 shadow-sm font-semibold' : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        <span x-text="t('tabOverview')"></span>
+    </button>
+    <button
+        @click="setProjectTab('growth')"
+        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap"
+        :class="projectTab === 'growth' ? 'bg-white text-purple-700 shadow-sm font-semibold' : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+        <span x-text="t('tabGrowth')"></span>
+    </button>
+    <button
+        @click="setProjectTab('quality')"
+        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap"
+        :class="projectTab === 'quality' ? 'bg-white text-purple-700 shadow-sm font-semibold' : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        <span x-text="t('tabQuality')"></span>
+    </button>
+    <button
+        @click="setProjectTab('visitors')"
+        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap"
+        :class="projectTab === 'visitors' ? 'bg-white text-purple-700 shadow-sm font-semibold' : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+        <span x-text="t('tabVisitors')"></span>
+        <span x-show="visitorsPage.total > 0" class="ml-1 px-1.5 py-0.5 rounded-full text-xs bg-purple-100 text-purple-700" x-text="visitorsPage.total"></span>
+    </button>
+    <button
+        @click="setProjectTab('diagnostics')"
+        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap"
+        :class="projectTab === 'diagnostics' ? 'bg-white text-purple-700 shadow-sm font-semibold' : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+        <span x-text="t('tabDiagnostics')"></span>
+        <span x-show="diagnostics.issues.length > 0" class="ml-1 px-1.5 py-0.5 rounded-full text-xs bg-red-100 text-red-700" x-text="diagnostics.issues.length"></span>
+    </button>
+</div>
