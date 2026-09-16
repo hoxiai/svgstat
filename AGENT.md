@@ -12,6 +12,7 @@
 > * Keep the rendering pipeline fast.
 > * Preserve long-term maintainability.
 > * Build a commercial-grade SaaS platform.
+> * Adhere to the engineering disciplines and workflows in `~/.config/superpowers` (Plan first, TDD, isolate critical changes, verify before completion).
 
 ---
 

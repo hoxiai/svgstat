@@ -14,14 +14,25 @@
             document.documentElement.lang = savedLang;
         })();
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/@unocss/runtime"></script>
+    <script src="/static/vendor/unocss-runtime.js"></script>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body class="bg-gray-50 min-h-screen">
     <div id="app" x-cloak x-data="spaApp()">
-        <div id="navbar-container"></div>
-        <div class="page-transition" id="page-container"></div>
-        <div id="modals-container"></div>
+        <div id="navbar-container">
+            {{ template "Navbar.html" . }}
+        </div>
+        <div class="page-transition" id="page-container">
+            {{ template "Home.html" . }}
+            {{ template "Login.html" . }}
+            {{ template "Register.html" . }}
+            {{ template "Dashboard.html" . }}
+            {{ template "DashboardProject.html" . }}
+        </div>
+        <div id="modals-container">
+            {{ template "CreateProjectModal.html" . }}
+            {{ template "ProjectDetailModal.html" . }}
+        </div>
 
         <div class="fixed bottom-8 left-1/2 -translate-x-1/2 z-[70] pointer-events-none">
             <div
@@ -50,8 +61,7 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js"></script>
-    <script src="/static/js/app.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script type="module" src="/static/js/app.js"></script>
+    <script defer src="/static/vendor/alpine.min.js"></script>
 </body>
 </html>

@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io"
 	"net/http"
 	"net/mail"
@@ -66,8 +67,29 @@ func (a *App) clearSessionCookie(w http.ResponseWriter) {
 	})
 }
 
+var spaTemplateFiles = []string{
+	"web/spa.html",
+	"web/components/Navbar.html",
+	"web/components/CreateProjectModal.html",
+	"web/components/ProjectDetailModal.html",
+	"web/components/pages/Home.html",
+	"web/components/pages/Login.html",
+	"web/components/pages/Register.html",
+	"web/components/pages/Dashboard.html",
+	"web/components/pages/DashboardProject.html",
+}
+
 func (a *App) handleSPA(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, "web/spa.html")
+	tmpl, err := template.ParseFiles(spaTemplateFiles...)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to parse SPA templates")
+		http.Error(w, "Failed to load page: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := tmpl.ExecuteTemplate(w, "spa.html", nil); err != nil {
+		log.Error().Err(err).Msg("Failed to execute SPA template")
+	}
 }
 
 func (a *App) handleAdminSPA(w http.ResponseWriter, r *http.Request) {

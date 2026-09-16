@@ -1,4 +1,4 @@
-const translations = {
+export const translations = {
     en: {
         dashboard: 'Dashboard',
         logout: 'Logout',
@@ -624,3 +624,7 @@ const translations = {
 		diagnostic_utm_attribution_missing: '页面 URL 含 UTM 参数，但未正确采集来源归因。'
     }
 };
+
+if (typeof window !== 'undefined') {
+    window.translations = translations;
+}
