@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/svgstat/svgstat/internal/config"
 	"github.com/svgstat/svgstat/internal/requestmeta"
 )
 
@@ -228,6 +229,38 @@ func TestSameOriginHonorsForwardedHTTPS(t *testing.T) {
 	app := &App{requestMeta: requestmeta.NewResolver([]string{"192.0.2.1"})}
 	if !app.sameOrigin(source, request) {
 		t.Fatal("forwarded HTTPS request was rejected")
+	}
+}
+
+func TestSameOriginAllowsPortMismatch(t *testing.T) {
+	request := httptest.NewRequest("POST", "http://example.com:8080/api/v1/projects", nil)
+	request.Host = "example.com:8080"
+	source, err := url.Parse("http://example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	app := &App{}
+	if !app.sameOrigin(source, request) {
+		t.Fatal("port-mismatched same-host request was rejected")
+	}
+}
+
+func TestCSRFMiddlewareCanBeDisabled(t *testing.T) {
+	app := &App{
+		config: &config.Config{
+			HTTP: config.HTTPConfig{CSRFCheckEnabled: false},
+		},
+	}
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
+	request := httptest.NewRequest("POST", "https://example.com/api/v1/projects", nil)
+	request.Host = "example.com"
+	request.Header.Set("Origin", "https://evil.example")
+	request.AddCookie(&http.Cookie{Name: "session_token", Value: "token"})
+
+	response := httptest.NewRecorder()
+	app.csrfMiddleware(next).ServeHTTP(response, request)
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("disabled CSRF check rejected request, code = %d", response.Code)
 	}
 }
 

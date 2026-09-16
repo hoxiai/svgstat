@@ -27,8 +27,9 @@ type HTTPConfig struct {
 	ReadTimeout    time.Duration
 	WriteTimeout   time.Duration
 	IdleTimeout    time.Duration
-	CookieSecure   bool
-	TrustedProxies []string
+	CookieSecure     bool
+	TrustedProxies   []string
+	CSRFCheckEnabled bool
 }
 
 type PostgresConfig struct {
@@ -92,8 +93,9 @@ func Load() *Config {
 			ReadTimeout:    getDurationEnv("HTTP_READ_TIMEOUT", 30*time.Second),
 			WriteTimeout:   getDurationEnv("HTTP_WRITE_TIMEOUT", 30*time.Second),
 			IdleTimeout:    getDurationEnv("HTTP_IDLE_TIMEOUT", 60*time.Second),
-			CookieSecure:   getBoolEnv("HTTP_COOKIE_SECURE", false),
-			TrustedProxies: getCSVEnv("HTTP_TRUSTED_PROXIES"),
+			CookieSecure:     getBoolEnv("HTTP_COOKIE_SECURE", false),
+			TrustedProxies:   getCSVEnv("HTTP_TRUSTED_PROXIES"),
+			CSRFCheckEnabled: getBoolEnv("CSRF_CHECK_ENABLED", true),
 		},
 		Postgres: PostgresConfig{
 			Host:     getEnv("PG_HOST", "localhost"),

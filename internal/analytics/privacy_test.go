@@ -63,6 +63,28 @@ func TestWebsiteAttributionInfersDirectAndReferral(t *testing.T) {
 	if source != "github.com" || medium != "referral" {
 		t.Fatalf("referral attribution = %q / %q", source, medium)
 	}
+
+	// Search engine -> organic
+	_, _, source, medium, _ = websiteAttribution("/", "https://www.google.com/search?q=svgstat")
+	if source != "www.google.com" || medium != "organic" {
+		t.Fatalf("google attribution = %q / %q, want organic", source, medium)
+	}
+
+	_, _, source, medium, _ = websiteAttribution("/", "https://www.baidu.com/s?wd=svgstat")
+	if source != "www.baidu.com" || medium != "organic" {
+		t.Fatalf("baidu attribution = %q / %q, want organic", source, medium)
+	}
+
+	// Social media -> social
+	_, _, source, medium, _ = websiteAttribution("/", "https://x.com/user/status/123")
+	if source != "x.com" || medium != "social" {
+		t.Fatalf("x attribution = %q / %q, want social", source, medium)
+	}
+
+	_, _, source, medium, _ = websiteAttribution("/", "https://www.zhihu.com/question/123")
+	if source != "www.zhihu.com" || medium != "social" {
+		t.Fatalf("zhihu attribution = %q / %q, want social", source, medium)
+	}
 }
 
 func TestCleanReferrerRemovesQueryAndFragment(t *testing.T) {

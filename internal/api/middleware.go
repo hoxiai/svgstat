@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -117,6 +118,10 @@ func (a *App) securityHeadersMiddleware(next http.Handler) http.Handler {
 
 func (a *App) csrfMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if a.config != nil && !a.config.HTTP.CSRFCheckEnabled {
+			next.ServeHTTP(w, r)
+			return
+		}
 		if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions || r.URL.Path == "/api/v1/collect" {
 			next.ServeHTTP(w, r)
 			return
@@ -132,6 +137,23 @@ func (a *App) csrfMiddleware(next http.Handler) http.Handler {
 		}
 		parsed, err := url.Parse(source)
 		if err != nil || source == "" || !a.sameOrigin(parsed, r) {
+			requestHost := r.Host
+			if a.requestMeta != nil {
+				requestHost = a.requestMeta.Host(r)
+			}
+			requestScheme := "http"
+			if a.requestMeta != nil {
+				requestScheme = a.requestMeta.Scheme(r)
+			} else if r.TLS != nil {
+				requestScheme = "https"
+			}
+			log.Warn().
+				Str("origin", source).
+				Str("request_host", requestHost).
+				Str("request_scheme", requestScheme).
+				Str("remote_addr", r.RemoteAddr).
+				Msg("Cross-origin request rejected by CSRF middleware")
+
 			a.jsonError(w, "Cross-origin request rejected", http.StatusForbidden)
 			return
 		}
@@ -140,10 +162,42 @@ func (a *App) csrfMiddleware(next http.Handler) http.Handler {
 }
 
 func (a *App) sameOrigin(source *url.URL, r *http.Request) bool {
-	if !strings.EqualFold(source.Host, r.Host) {
+	requestHost := r.Host
+	if a.requestMeta != nil {
+		requestHost = a.requestMeta.Host(r)
+	}
+
+	hostMatched := strings.EqualFold(source.Host, requestHost) ||
+		strings.EqualFold(stripPort(source.Host), stripPort(requestHost))
+	if !hostMatched {
 		return false
 	}
-	return strings.EqualFold(source.Scheme, a.requestMeta.Scheme(r))
+
+	requestScheme := "http"
+	if a.requestMeta != nil {
+		requestScheme = a.requestMeta.Scheme(r)
+	} else if r.TLS != nil {
+		requestScheme = "https"
+	}
+
+	if strings.EqualFold(source.Scheme, requestScheme) {
+		return true
+	}
+
+	// Allow https origin when request reached backend as http through a trusted proxy
+	if source.Scheme == "https" && a.requestMeta != nil && a.requestMeta.Trusted(r.RemoteAddr) {
+		return true
+	}
+
+	return false
+}
+
+func stripPort(hostport string) string {
+	host, _, err := net.SplitHostPort(hostport)
+	if err == nil {
+		return host
+	}
+	return hostport
 }
 
 func (a *App) authRateLimitMiddleware(next http.Handler) http.Handler {

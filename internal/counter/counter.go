@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/rs/zerolog/log"
 	"github.com/svgstat/svgstat/internal/cache"
 	"github.com/svgstat/svgstat/internal/project"
 )
@@ -27,13 +28,44 @@ func New(cache *cache.Cache, projectRepo project.Repository, keyTTL time.Duratio
 	}
 }
 
-func (c *Counter) Increment(ctx context.Context, projectID, counterName string) (int64, error) {
+func (c *Counter) ensureLoaded(ctx context.Context, projectID, counterName string) {
+	if c.projectRepo == nil {
+		return
+	}
 	key := cache.BuildKey("project", projectID, "counter", counterName)
-	value, err := c.cache.Increment(ctx, key)
+	exists, err := c.cache.Exists(ctx, key)
 	if err != nil {
+		log.Warn().Err(err).Str("project_id", projectID).Str("counter", counterName).Msg("Failed to check counter existence in cache")
+		return
+	}
+	if !exists {
+		dbVal, err := c.projectRepo.GetCounter(ctx, projectID, counterName)
+		if err != nil {
+			log.Warn().Err(err).Str("project_id", projectID).Str("counter", counterName).Msg("Failed to load counter from database")
+			return
+		}
+		if dbVal > 0 {
+			_, _ = c.cache.SetNX(ctx, key, fmt.Sprintf("%d", dbVal), 0)
+		}
+	}
+	registryKey := cache.BuildKey("project", projectID, "counters")
+	_ = c.cache.GetClient().SAdd(ctx, registryKey, counterName).Err()
+}
+
+func (c *Counter) Increment(ctx context.Context, projectID, counterName string) (int64, error) {
+	c.ensureLoaded(ctx, projectID, counterName)
+
+	key := cache.BuildKey("project", projectID, "counter", counterName)
+	registryKey := cache.BuildKey("project", projectID, "counters")
+
+	pipe := c.cache.Pipeline()
+	incrCmd := pipe.Incr(ctx, key)
+	pipe.SAdd(ctx, registryKey, counterName)
+
+	if _, err := pipe.Exec(ctx); err != nil {
 		return 0, fmt.Errorf("failed to increment counter: %w", err)
 	}
-	return value, nil
+	return incrCmd.Val(), nil
 }
 
 func (c *Counter) Get(ctx context.Context, projectID, counterName string) (int64, error) {
@@ -41,6 +73,15 @@ func (c *Counter) Get(ctx context.Context, projectID, counterName string) (int64
 	valueStr, err := c.cache.Get(ctx, key)
 	if err != nil {
 		if err == redis.Nil {
+			if c.projectRepo != nil {
+				dbVal, dbErr := c.projectRepo.GetCounter(ctx, projectID, counterName)
+				if dbErr == nil && dbVal > 0 {
+					_, _ = c.cache.SetNX(ctx, key, fmt.Sprintf("%d", dbVal), 0)
+					registryKey := cache.BuildKey("project", projectID, "counters")
+					_ = c.cache.GetClient().SAdd(ctx, registryKey, counterName).Err()
+					return dbVal, nil
+				}
+			}
 			return 0, nil
 		}
 		return 0, fmt.Errorf("failed to get counter: %w", err)
@@ -57,18 +98,33 @@ func (c *Counter) Get(ctx context.Context, projectID, counterName string) (int64
 
 func (c *Counter) Set(ctx context.Context, projectID, counterName string, value int64) error {
 	key := cache.BuildKey("project", projectID, "counter", counterName)
-	err := c.cache.Set(ctx, key, fmt.Sprintf("%d", value), 0)
-	if err != nil {
+	registryKey := cache.BuildKey("project", projectID, "counters")
+
+	pipe := c.cache.Pipeline()
+	pipe.Set(ctx, key, fmt.Sprintf("%d", value), 0)
+	pipe.SAdd(ctx, registryKey, counterName)
+	if _, err := pipe.Exec(ctx); err != nil {
 		return fmt.Errorf("failed to set counter: %w", err)
 	}
+
+	if c.projectRepo != nil {
+		if err := c.projectRepo.UpsertCounter(ctx, projectID, counterName, value); err != nil {
+			log.Warn().Err(err).Str("project_id", projectID).Str("counter", counterName).Msg("Failed to persist counter to DB")
+		}
+	}
+
 	return nil
 }
 
 func (c *Counter) IncrementWithAnalytics(ctx context.Context, projectID, counterName string) (int64, error) {
+	c.ensureLoaded(ctx, projectID, counterName)
+
 	key := cache.BuildKey("project", projectID, "counter", counterName)
+	registryKey := cache.BuildKey("project", projectID, "counters")
 
 	pipe := c.cache.Pipeline()
 	incrCmd := pipe.Incr(ctx, key)
+	pipe.SAdd(ctx, registryKey, counterName)
 
 	// UTC day bucket, consistent with analytics keys and worker flush windows.
 	date := time.Now().UTC().Format("2006-01-02")

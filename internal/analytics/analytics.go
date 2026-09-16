@@ -199,6 +199,10 @@ func New(cache *cache.Cache, projectRepo project.Repository, geoIP *geoip.GeoIP,
 	}
 }
 
+func (a *Analytics) Cache() *cache.Cache {
+	return a.cache
+}
+
 func (a *Analytics) SetCardinalityLimits(maxDailyVisitors, maxDimensionValues int, observer interface{ ObserveCardinalityDrop(string) }) {
 	a.maxDailyVisitors = maxDailyVisitors
 	a.maxDimensionValues = maxDimensionValues
@@ -652,20 +656,55 @@ func websiteAttribution(rawPath, rawReferrer string) (path, referrer, source, me
 		campaign = cleanDimension(query.Get("utm_campaign"))
 	}
 	referrer = cleanReferrer(rawReferrer)
+	domain := referrerDomain(referrer)
+	refSource, refMedium := classifyReferrer(domain)
+
 	if source == "" {
-		source = referrerDomain(referrer)
-		if source == "" {
-			source = "direct"
-		}
+		source = refSource
 	}
 	if medium == "" {
-		if source == "direct" {
+		if source == refSource {
+			medium = refMedium
+		} else if source == "direct" {
 			medium = "none"
 		} else {
 			medium = "referral"
 		}
 	}
 	return path, referrer, source, medium, campaign
+}
+
+func classifyReferrer(domain string) (source, medium string) {
+	if domain == "" {
+		return "direct", "none"
+	}
+
+	source = domain
+	d := strings.TrimPrefix(strings.ToLower(domain), "www.")
+
+	// Search engines -> organic
+	if strings.Contains(d, "google.") ||
+		strings.Contains(d, "bing.com") ||
+		strings.Contains(d, "baidu.com") ||
+		strings.Contains(d, "sogou.com") ||
+		strings.Contains(d, "so.com") ||
+		strings.Contains(d, "duckduckgo.com") ||
+		strings.Contains(d, "yahoo.com") ||
+		strings.Contains(d, "yandex.") ||
+		strings.Contains(d, "ecosia.org") {
+		return source, "organic"
+	}
+
+	// Social networks & communities -> social
+	if d == "twitter.com" || d == "x.com" || d == "t.co" ||
+		d == "facebook.com" || d == "instagram.com" ||
+		d == "reddit.com" || d == "linkedin.com" ||
+		d == "weibo.com" || d == "zhihu.com" ||
+		d == "v2ex.com" || strings.Contains(d, "weixin.qq.com") {
+		return source, "social"
+	}
+
+	return source, "referral"
 }
 
 func WebsiteAttribution(rawPath, rawReferrer string) (path, referrer, source, medium, campaign string) {

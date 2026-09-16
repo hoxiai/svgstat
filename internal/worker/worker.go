@@ -6,11 +6,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
 	"github.com/svgstat/svgstat/internal/analytics"
+	"github.com/svgstat/svgstat/internal/cache"
 	"github.com/svgstat/svgstat/internal/project"
 )
 
@@ -105,6 +108,10 @@ func (w *Worker) observedFlush(ctx context.Context) error {
 // FlushOnce persists today and yesterday for every project. Today is flushed
 // repeatedly so history stays fresh; yesterday is flushed so keys may expire.
 func (w *Worker) FlushOnce(ctx context.Context) error {
+	if err := w.flushCounters(ctx); err != nil {
+		log.Error().Err(err).Msg("Failed to flush counters to PostgreSQL")
+	}
+
 	projects, err := w.projectRepo.ListAll(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list projects: %w", err)
@@ -132,6 +139,74 @@ func (w *Worker) FlushOnce(ctx context.Context) error {
 	}
 
 	log.Debug().Int("rows", flushed).Msg("Analytics flush completed")
+	return nil
+}
+
+func (w *Worker) flushCounters(ctx context.Context) error {
+	if w.analytics == nil || w.analytics.Cache() == nil || w.projectRepo == nil {
+		return nil
+	}
+
+	rdb := w.analytics.Cache().GetClient()
+	matchPattern := cache.BuildKey("project", "*", "counter", "*")
+	var cursor uint64
+	flushed := 0
+
+	prefix := "svgstat:project:"
+
+	for {
+		keys, nextCursor, err := rdb.Scan(ctx, cursor, matchPattern, 200).Result()
+		if err != nil {
+			return fmt.Errorf("failed to scan counter keys: %w", err)
+		}
+
+		for _, key := range keys {
+			// Skip history keys like "svgstat:project:{id}:counter:{name}:history:{date}"
+			if strings.Contains(key, ":history:") {
+				continue
+			}
+			if !strings.HasPrefix(key, prefix) {
+				continue
+			}
+
+			rest := strings.TrimPrefix(key, prefix)
+			counterIdx := strings.Index(rest, ":counter:")
+			if counterIdx == -1 {
+				continue
+			}
+
+			projectID := rest[:counterIdx]
+			counterName := rest[counterIdx+len(":counter:"):]
+			if projectID == "" || counterName == "" {
+				continue
+			}
+
+			valStr, err := rdb.Get(ctx, key).Result()
+			if err != nil {
+				continue
+			}
+
+			val, err := strconv.ParseInt(valStr, 10, 64)
+			if err != nil {
+				continue
+			}
+
+			if err := w.projectRepo.UpsertCounter(ctx, projectID, counterName, val); err != nil {
+				log.Error().Err(err).Str("project_id", projectID).Str("counter", counterName).Msg("Failed to persist counter")
+				continue
+			}
+			flushed++
+		}
+
+		cursor = nextCursor
+		if cursor == 0 {
+			break
+		}
+	}
+
+	if flushed > 0 {
+		log.Debug().Int("counters", flushed).Msg("Counters flush completed")
+	}
 	return nil
 }
 

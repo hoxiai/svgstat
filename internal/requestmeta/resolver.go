@@ -10,8 +10,19 @@ type Resolver struct {
 	trusted []*net.IPNet
 }
 
+var defaultTrustedProxies = []string{
+	"127.0.0.1/32",
+	"::1/128",
+	"10.0.0.0/8",
+	"172.16.0.0/12",
+	"192.168.0.0/16",
+}
+
 func NewResolver(entries []string) *Resolver {
 	resolver := &Resolver{}
+	if len(entries) == 0 {
+		entries = defaultTrustedProxies
+	}
 	for _, entry := range entries {
 		entry = strings.TrimSpace(entry)
 		if entry == "" {
@@ -30,6 +41,15 @@ func NewResolver(entries []string) *Resolver {
 		}
 	}
 	return resolver
+}
+
+func (r *Resolver) Host(request *http.Request) string {
+	if r.Trusted(request.RemoteAddr) {
+		if forwarded := firstHeaderValue(request.Header.Get("X-Forwarded-Host")); forwarded != "" {
+			return forwarded
+		}
+	}
+	return request.Host
 }
 
 func (r *Resolver) Trusted(remoteAddr string) bool {

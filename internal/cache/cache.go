@@ -69,6 +69,15 @@ func (c *Cache) Delete(ctx context.Context, keys ...string) error {
 	return c.client.Del(ctx, keys...).Err()
 }
 
+func (c *Cache) Exists(ctx context.Context, keys ...string) (bool, error) {
+	n, err := c.client.Exists(ctx, keys...).Result()
+	return n > 0, err
+}
+
+func (c *Cache) SetNX(ctx context.Context, key string, value interface{}, expiration time.Duration) (bool, error) {
+	return c.client.SetNX(ctx, key, value, expiration).Result()
+}
+
 func (c *Cache) Publish(ctx context.Context, channel, message string) error {
 	return c.client.Publish(ctx, channel, message).Err()
 }

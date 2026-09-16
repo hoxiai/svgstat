@@ -52,11 +52,12 @@
                         <p class="text-xs text-gray-500 mt-1" x-text="t('recommendedEmbedHint')"></p>
                     </div>
                     <div class="inline-flex rounded-lg border border-gray-200 bg-white p-1">
-						<button @click="embedFormat = 'website'" class="rounded-md px-3 py-1.5 text-sm" :class="embedFormat === 'website' ? 'bg-purple-600 text-white' : 'text-gray-600'" x-text="t('website')"></button>
+						<button @click="embedFormat = 'website'" class="rounded-md px-3 py-1.5 text-sm font-medium" :class="embedFormat === 'website' ? 'bg-purple-600 text-white' : 'text-gray-600'" x-text="lang === 'zh' ? '网站 JS 探针 SDK' : 'Website JS SDK'"></button>
                         <button @click="embedFormat = 'github'" class="rounded-md px-3 py-1.5 text-sm" :class="embedFormat === 'github' ? 'bg-purple-600 text-white' : 'text-gray-600'">GitHub / Markdown</button>
                         <button @click="embedFormat = 'html'" class="rounded-md px-3 py-1.5 text-sm" :class="embedFormat === 'html' ? 'bg-purple-600 text-white' : 'text-gray-600'">HTML</button>
                     </div>
                 </div>
+                <p x-show="embedFormat === 'website'" class="text-xs text-purple-700 bg-purple-50 border border-purple-200 rounded-lg p-2.5 mb-3" x-text="lang === 'zh' ? '将以下代码粘贴到你的网站或博客 HTML 的 <head> 或 <body> 标签中，即可开启实时访客统计、PV/UV、会话流向与转化分析：' : 'Paste the code below into your website HTML <head> or <body> to start real-time analytics:'"></p>
                 <div class="flex flex-col sm:flex-row items-stretch gap-3">
                     <code class="flex-1 rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-700 break-all" x-text="getRecommendedEmbed()"></code>
                     <button @click="copyText(getRecommendedEmbed())" class="rounded-lg bg-purple-600 px-5 py-2 text-sm font-medium text-white hover:bg-purple-700" x-text="t('copy')"></button>

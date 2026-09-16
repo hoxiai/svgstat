@@ -57,6 +57,14 @@ type WidgetSettings struct {
 	UpdatedAt time.Time
 }
 
+type ProjectCounter struct {
+	ProjectID   string
+	CounterName string
+	Value       int64
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
 type Repository interface {
 	GetByID(ctx context.Context, id string) (*Project, error)
 	GetByIDAndUser(ctx context.Context, id, userID string) (*Project, error)
@@ -74,4 +82,8 @@ type Repository interface {
 
 	GetWidgetSettings(ctx context.Context, projectID, widgetKey string) (*WidgetSettings, error)
 	UpsertWidgetSettings(ctx context.Context, settings *WidgetSettings) error
+
+	GetCounter(ctx context.Context, projectID, counterName string) (int64, error)
+	UpsertCounter(ctx context.Context, projectID, counterName string, value int64) error
+	ListCounters(ctx context.Context, projectID string) (map[string]int64, error)
 }

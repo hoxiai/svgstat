@@ -36,6 +36,7 @@ help:
 	@echo "  clean       - Remove volumes and data"
 	@echo "  migrate-up  - Apply database migrations"
 	@echo "  migrate-status - Show migration status"
+	@echo "  sync        - Manually sync Redis data to PostgreSQL"
 	@echo ""
 	@echo "Environment Variables:"
 	@echo "  CONTAINER_RUNTIME - Set to 'podman' (default) or 'docker'"
@@ -70,6 +71,10 @@ migrate-up:
 migrate-status:
 	@echo "Checking migration status..."
 	go run cmd/migrate/main.go status
+
+sync:
+	@echo "Syncing Redis data to PostgreSQL..."
+	go run cmd/sync/main.go
 
 up:
 	@echo "Starting services with $(CONTAINER_RUNTIME)..."

@@ -427,3 +427,66 @@ func (r *PostgresRepository) UpsertWidgetSettings(ctx context.Context, settings 
 
 	return nil
 }
+
+func (r *PostgresRepository) GetCounter(ctx context.Context, projectID, counterName string) (int64, error) {
+	query := `
+		SELECT value
+		FROM project_counters
+		WHERE project_id = $1 AND counter_name = $2
+	`
+
+	var value int64
+	err := r.pool.QueryRow(ctx, query, projectID, counterName).Scan(&value)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("failed to get counter: %w", err)
+	}
+
+	return value, nil
+}
+
+func (r *PostgresRepository) UpsertCounter(ctx context.Context, projectID, counterName string, value int64) error {
+	query := `
+		INSERT INTO project_counters (
+			project_id, counter_name, value, created_at, updated_at
+		) VALUES ($1, $2, $3, NOW(), NOW())
+		ON CONFLICT (project_id, counter_name) DO UPDATE SET
+			value = GREATEST(project_counters.value, EXCLUDED.value),
+			updated_at = NOW()
+	`
+
+	_, err := r.pool.Exec(ctx, query, projectID, counterName, value)
+	if err != nil {
+		return fmt.Errorf("failed to upsert counter: %w", err)
+	}
+
+	return nil
+}
+
+func (r *PostgresRepository) ListCounters(ctx context.Context, projectID string) (map[string]int64, error) {
+	query := `
+		SELECT counter_name, value
+		FROM project_counters
+		WHERE project_id = $1
+	`
+
+	rows, err := r.pool.Query(ctx, query, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list counters: %w", err)
+	}
+	defer rows.Close()
+
+	counters := make(map[string]int64)
+	for rows.Next() {
+		var name string
+		var val int64
+		if err := rows.Scan(&name, &val); err != nil {
+			return nil, fmt.Errorf("failed to scan counter: %w", err)
+		}
+		counters[name] = val
+	}
+
+	return counters, rows.Err()
+}
