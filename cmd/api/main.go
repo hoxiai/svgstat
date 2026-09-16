@@ -8,11 +8,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/hoxiai/svgstat/internal/api"
+	"github.com/hoxiai/svgstat/internal/config"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/svgstat/svgstat/internal/api"
-	"github.com/svgstat/svgstat/internal/config"
 )
 
 func main() {

@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hoxiai/svgstat/internal/cache"
+	"github.com/hoxiai/svgstat/internal/project"
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
-	"github.com/svgstat/svgstat/internal/cache"
-	"github.com/svgstat/svgstat/internal/project"
 )
 
 type Counter struct {

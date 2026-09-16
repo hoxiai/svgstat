@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hoxiai/svgstat/internal/config"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
-	"github.com/svgstat/svgstat/internal/config"
 )
 
 type Database struct {

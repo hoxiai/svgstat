@@ -66,16 +66,16 @@ SVGStat also includes a shared no-signup badge node for quick public usage. Each
 ## Live Demo
 
 - Product site: [https://svgstat.com](https://svgstat.com)
-- Shared free badge: `https://svgstat.com/svg/free/badge/visitor.svg?label=visitors&page_id=github.com/svgstat/demo`
+- Shared free badge: `https://svgstat.com/svg/free/badge/visitor.svg?label=visitors&page_id=github.com/hoxiai/demo`
 - Demo project slug: `demo`
-- Counter endpoint: `https://svgstat.com/svg/demo/counter/visits.svg?label=Visits&color=7c3aed&page_id=github.com/svgstat/demo`
-- Badge endpoint: `https://svgstat.com/svg/demo/badge/requests.svg?label=Requests&color=0ea5e9&style=flat&page_id=github.com/svgstat/demo`
+- Counter endpoint: `https://svgstat.com/svg/demo/counter/visits.svg?label=Visits&color=7c3aed&page_id=github.com/hoxiai/demo`
+- Badge endpoint: `https://svgstat.com/svg/demo/badge/requests.svg?label=Requests&color=0ea5e9&style=flat&page_id=github.com/hoxiai/demo`
 - Markdown embed:
 
 ```markdown
-![Visits](https://svgstat.com/svg/demo/counter/visits.svg?label=Visits&color=7c3aed&page_id=github.com/svgstat/demo)
+![Visits](https://svgstat.com/svg/demo/counter/visits.svg?label=Visits&color=7c3aed&page_id=github.com/hoxiai/demo)
 ```
-![Visits](https://svgstat.com/svg/demo/counter/visits.svg?label=Visits&color=7c3aed&page_id=github.com/svgstat/demo)
+![Visits](https://svgstat.com/svg/demo/counter/visits.svg?label=Visits&color=7c3aed&page_id=github.com/hoxiai/demo)
 
 ## Quick Start
 

@@ -9,7 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/svgstat/svgstat/internal/analytics"
+	"github.com/hoxiai/svgstat/internal/analytics"
 )
 
 type liveStatsReader interface {

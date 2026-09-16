@@ -7,15 +7,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/hoxiai/svgstat/internal/analytics"
+	"github.com/hoxiai/svgstat/internal/cache"
+	"github.com/hoxiai/svgstat/internal/config"
+	"github.com/hoxiai/svgstat/internal/database"
+	"github.com/hoxiai/svgstat/internal/project"
+	"github.com/hoxiai/svgstat/internal/worker"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/svgstat/svgstat/internal/analytics"
-	"github.com/svgstat/svgstat/internal/cache"
-	"github.com/svgstat/svgstat/internal/config"
-	"github.com/svgstat/svgstat/internal/database"
-	"github.com/svgstat/svgstat/internal/project"
-	"github.com/svgstat/svgstat/internal/worker"
 )
 
 func main() {

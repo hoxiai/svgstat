@@ -10,7 +10,7 @@ import (
 
 	"golang.org/x/sync/singleflight"
 
-	"github.com/svgstat/svgstat/internal/cache"
+	"github.com/hoxiai/svgstat/internal/cache"
 )
 
 type runtimeCacheBackend interface {

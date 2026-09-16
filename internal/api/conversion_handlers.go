@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/hoxiai/svgstat/internal/auth"
+	"github.com/hoxiai/svgstat/internal/conversion"
+	"github.com/hoxiai/svgstat/internal/metrics"
 	"github.com/rs/zerolog/log"
-	"github.com/svgstat/svgstat/internal/auth"
-	"github.com/svgstat/svgstat/internal/conversion"
-	"github.com/svgstat/svgstat/internal/metrics"
 )
 
 type goalInput struct {

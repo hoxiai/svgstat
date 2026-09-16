@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hoxiai/svgstat/internal/cache"
 	"github.com/redis/go-redis/v9"
-	"github.com/svgstat/svgstat/internal/cache"
 )
 
 const retention = 30 * time.Minute

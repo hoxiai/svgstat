@@ -15,13 +15,13 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/hoxiai/svgstat/internal/analytics"
+	"github.com/hoxiai/svgstat/internal/auth"
+	"github.com/hoxiai/svgstat/internal/conversion"
+	"github.com/hoxiai/svgstat/internal/diagnostics"
+	"github.com/hoxiai/svgstat/internal/project"
+	"github.com/hoxiai/svgstat/internal/renderer"
 	"github.com/rs/zerolog/log"
-	"github.com/svgstat/svgstat/internal/analytics"
-	"github.com/svgstat/svgstat/internal/auth"
-	"github.com/svgstat/svgstat/internal/conversion"
-	"github.com/svgstat/svgstat/internal/diagnostics"
-	"github.com/svgstat/svgstat/internal/project"
-	"github.com/svgstat/svgstat/internal/renderer"
 )
 
 func (a *App) jsonError(w http.ResponseWriter, message string, status int) {

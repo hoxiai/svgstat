@@ -66,17 +66,17 @@ SVGStat 还内置了一个无需注册即可使用的公共徽章节点。每个
 ## 实际演示
 
 - 产品站点：[https://svgstat.com](https://svgstat.com)
-- 免费公共徽章：`https://svgstat.com/svg/free/badge/visitor.svg?label=visitors&page_id=github.com/svgstat/demo`
+- 免费公共徽章：`https://svgstat.com/svg/free/badge/visitor.svg?label=visitors&page_id=github.com/hoxiai/demo`
 - 演示项目标识：`demo`
-- 计数器地址：`https://svgstat.com/svg/demo/counter/visits.svg?label=Visits&color=7c3aed&page_id=github.com/svgstat/demo`
-- 徽章地址：`https://svgstat.com/svg/demo/badge/requests.svg?label=Requests&color=0ea5e9&style=flat&page_id=github.com/svgstat/demo`
+- 计数器地址：`https://svgstat.com/svg/demo/counter/visits.svg?label=Visits&color=7c3aed&page_id=github.com/hoxiai/demo`
+- 徽章地址：`https://svgstat.com/svg/demo/badge/requests.svg?label=Requests&color=0ea5e9&style=flat&page_id=github.com/hoxiai/demo`
 - Markdown 嵌入：
 
 ```markdown
-![Visits](https://svgstat.com/svg/demo/counter/visits.svg?label=Visits&color=7c3aed&page_id=github.com/svgstat/demo)
+![Visits](https://svgstat.com/svg/demo/counter/visits.svg?label=Visits&color=7c3aed&page_id=github.com/hoxiai/demo)
 ```
 
-![Visits](https://svgstat.com/svg/demo/counter/visits.svg?label=Visits&color=7c3aed&page_id=github.com/svgstat/demo)
+![Visits](https://svgstat.com/svg/demo/counter/visits.svg?label=Visits&color=7c3aed&page_id=github.com/hoxiai/demo)
 
 ## 快速开始
 

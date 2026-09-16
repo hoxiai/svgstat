@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
+	adminservice "github.com/hoxiai/svgstat/internal/admin"
+	"github.com/hoxiai/svgstat/internal/auth"
 	"github.com/rs/zerolog/log"
-	adminservice "github.com/svgstat/svgstat/internal/admin"
-	"github.com/svgstat/svgstat/internal/auth"
 )
 
 func (a *App) adminMiddleware(next http.Handler) http.Handler {

@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hoxiai/svgstat/internal/analytics"
+	"github.com/hoxiai/svgstat/internal/cache"
+	"github.com/hoxiai/svgstat/internal/project"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
-	"github.com/svgstat/svgstat/internal/analytics"
-	"github.com/svgstat/svgstat/internal/cache"
-	"github.com/svgstat/svgstat/internal/project"
 )
 
 // Worker persists Redis analytics aggregates into PostgreSQL daily_statistics.

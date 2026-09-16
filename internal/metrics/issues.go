@@ -7,7 +7,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/svgstat/svgstat/internal/analytics"
+	"github.com/hoxiai/svgstat/internal/analytics"
 )
 
 type IssueGoal struct {

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/svgstat/svgstat/internal/analytics"
+	"github.com/hoxiai/svgstat/internal/analytics"
 )
 
 func TestQualityTotals(t *testing.T) {

@@ -5,10 +5,10 @@ import (
 	"log"
 	"time"
 
+	"github.com/hoxiai/svgstat/internal/config"
+	"github.com/hoxiai/svgstat/internal/database"
+	"github.com/hoxiai/svgstat/internal/project"
 	"github.com/joho/godotenv"
-	"github.com/svgstat/svgstat/internal/config"
-	"github.com/svgstat/svgstat/internal/database"
-	"github.com/svgstat/svgstat/internal/project"
 )
 
 func main() {

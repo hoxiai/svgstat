@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hoxiai/svgstat/internal/cache"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/svgstat/svgstat/internal/cache"
 )
 
 var eventNamePattern = regexp.MustCompile(`^[a-z][a-z0-9_.-]{0,63}$`)

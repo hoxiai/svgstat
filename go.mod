@@ -1,4 +1,4 @@
-module github.com/svgstat/svgstat
+module github.com/hoxiai/svgstat
 
 go 1.25.1
 

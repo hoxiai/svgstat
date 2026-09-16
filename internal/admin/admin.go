@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hoxiai/svgstat/internal/project"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/svgstat/svgstat/internal/project"
 )
 
 var (

@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/svgstat/svgstat/internal/cache"
-	"github.com/svgstat/svgstat/internal/config"
-	"github.com/svgstat/svgstat/internal/project"
+	"github.com/hoxiai/svgstat/internal/cache"
+	"github.com/hoxiai/svgstat/internal/config"
+	"github.com/hoxiai/svgstat/internal/project"
 )
 
 type stubProjectRepo struct {
@@ -36,7 +36,7 @@ func (s *stubProjectRepo) GetByExternalID(ctx context.Context, externalID string
 func (s *stubProjectRepo) Create(ctx context.Context, p *project.Project) error { return nil }
 func (s *stubProjectRepo) Update(ctx context.Context, p *project.Project) error { return nil }
 func (s *stubProjectRepo) Delete(ctx context.Context, id, userID string) error  { return nil }
-func (s *stubProjectRepo) Upsert(ctx context.Context, p *project.Project) error  { return nil }
+func (s *stubProjectRepo) Upsert(ctx context.Context, p *project.Project) error { return nil }
 func (s *stubProjectRepo) GetLimits(ctx context.Context, projectID string) (*project.ProjectLimits, error) {
 	return nil, nil
 }

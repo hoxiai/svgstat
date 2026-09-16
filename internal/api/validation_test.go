@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/svgstat/svgstat/internal/config"
-	"github.com/svgstat/svgstat/internal/requestmeta"
+	"github.com/hoxiai/svgstat/internal/config"
+	"github.com/hoxiai/svgstat/internal/requestmeta"
 )
 
 func TestParseCustomEvent(t *testing.T) {

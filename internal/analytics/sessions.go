@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hoxiai/svgstat/internal/cache"
 	"github.com/redis/go-redis/v9"
-	"github.com/svgstat/svgstat/internal/cache"
 )
 
 const sessionTimeout = 30 * time.Minute
