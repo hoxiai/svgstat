@@ -40,7 +40,6 @@ func TestHandleSPARendersEmbeddedComponents(t *testing.T) {
 		`showCreateModal`,                                // from CreateProjectModal.html
 		`showCodeModal`,                                  // from ProjectDetailModal.html
 		`/static/vendor/unocss-runtime.js`,
-		`/static/vendor/alpine.min.js`,
 		`type="module" src="/static/js/app.js"`,
 	}
 
@@ -61,7 +60,7 @@ func TestStaticAssetsAvailable(t *testing.T) {
 	}
 
 	files := []string{
-		"web/static/vendor/alpine.min.js",
+		"web/static/vendor/alpine.esm.js",
 		"web/static/vendor/unocss-runtime.js",
 		"web/static/js/app.js",
 		"web/static/js/translations.js",

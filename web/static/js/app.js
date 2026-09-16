@@ -1,3 +1,4 @@
+import Alpine from '../vendor/alpine.esm.js';
 import { createInitialState } from './modules/state.js';
 import { createFormatterMethods } from './modules/formatters.js';
 import { createRouterMethods } from './modules/router.js';
@@ -36,10 +37,8 @@ export function spaApp() {
 }
 
 if (typeof window !== 'undefined') {
+    window.Alpine = Alpine;
     window.spaApp = spaApp;
-    document.addEventListener('alpine:init', () => {
-        if (window.Alpine) {
-            window.Alpine.data('spaApp', spaApp);
-        }
-    });
+    Alpine.data('spaApp', spaApp);
+    Alpine.start();
 }
