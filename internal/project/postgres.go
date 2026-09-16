@@ -211,8 +211,9 @@ func (r *PostgresRepository) Create(ctx context.Context, project *Project) error
 		INSERT INTO projects (
 			id, user_id, external_project_id, tenant_id, slug, name, description, status, visibility,
 			public_token_hash, default_theme, default_locale, render_enabled, badge_enabled,
-			widget_enabled, chart_enabled, last_synced_at, created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW(), NOW())
+			widget_enabled, chart_enabled, website_tracking_enabled, website_domains,
+			last_synced_at, created_at, updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, NOW(), NOW())
 	`
 
 	_, err := r.pool.Exec(ctx, query,
@@ -276,8 +277,9 @@ func (r *PostgresRepository) Upsert(ctx context.Context, project *Project) error
 		INSERT INTO projects (
 			id, user_id, external_project_id, tenant_id, slug, name, description, status, visibility,
 			public_token_hash, default_theme, default_locale, render_enabled, badge_enabled,
-			widget_enabled, chart_enabled, last_synced_at, created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW(), NOW())
+			widget_enabled, chart_enabled, website_tracking_enabled, website_domains,
+			last_synced_at, created_at, updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, NOW(), NOW())
 		ON CONFLICT (id) DO UPDATE SET
 			user_id = EXCLUDED.user_id,
 			external_project_id = EXCLUDED.external_project_id,
@@ -294,6 +296,8 @@ func (r *PostgresRepository) Upsert(ctx context.Context, project *Project) error
 			badge_enabled = EXCLUDED.badge_enabled,
 			widget_enabled = EXCLUDED.widget_enabled,
 			chart_enabled = EXCLUDED.chart_enabled,
+			website_tracking_enabled = EXCLUDED.website_tracking_enabled,
+			website_domains = EXCLUDED.website_domains,
 			last_synced_at = EXCLUDED.last_synced_at,
 			updated_at = NOW()
 	`
@@ -302,7 +306,8 @@ func (r *PostgresRepository) Upsert(ctx context.Context, project *Project) error
 		project.ID, project.UserID, project.ExternalProjectID, project.TenantID, project.Slug, project.Name,
 		project.Description, project.Status, project.Visibility, project.PublicTokenHash,
 		project.DefaultTheme, project.DefaultLocale, project.RenderEnabled, project.BadgeEnabled,
-		project.WidgetEnabled, project.ChartEnabled, project.LastSyncedAt,
+		project.WidgetEnabled, project.ChartEnabled, project.WebsiteTrackingEnabled,
+		project.WebsiteDomains, project.LastSyncedAt,
 	)
 
 	if err != nil {
