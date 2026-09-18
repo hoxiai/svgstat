@@ -9,6 +9,7 @@ import (
 	"github.com/hoxiai/svgstat/internal/cache"
 	"github.com/hoxiai/svgstat/internal/config"
 	"github.com/hoxiai/svgstat/internal/project"
+	"github.com/joho/godotenv"
 )
 
 type stubProjectRepo struct {
@@ -79,12 +80,8 @@ func (s *stubProjectRepo) ListCounters(ctx context.Context, projectID string) (m
 }
 
 func TestCounterColdStartFallback(t *testing.T) {
-	cfg := &config.Config{
-		Redis: config.RedisConfig{
-			Addr: "localhost:6379",
-		},
-	}
-	c, err := cache.New(cfg)
+	_ = godotenv.Load("../../.env")
+	c, err := cache.New(config.Load())
 	if err != nil {
 		t.Skip("Skipping test: Redis not reachable on localhost:6379")
 	}
@@ -130,12 +127,8 @@ func TestCounterColdStartFallback(t *testing.T) {
 }
 
 func TestCounterSetAndPersistence(t *testing.T) {
-	cfg := &config.Config{
-		Redis: config.RedisConfig{
-			Addr: "localhost:6379",
-		},
-	}
-	c, err := cache.New(cfg)
+	_ = godotenv.Load("../../.env")
+	c, err := cache.New(config.Load())
 	if err != nil {
 		t.Skip("Skipping test: Redis not reachable on localhost:6379")
 	}
@@ -169,4 +162,47 @@ func TestCounterSetAndPersistence(t *testing.T) {
 
 	_ = c.Delete(ctx, key)
 	_ = c.Delete(ctx, cache.BuildKey("project", projectID, "counters"))
+}
+
+func TestCounterKeysExpireAfterInactivity(t *testing.T) {
+	_ = godotenv.Load("../../.env")
+	c, err := cache.New(config.Load())
+	if err != nil {
+		t.Skip("Skipping test: Redis not reachable on localhost:6379")
+	}
+	defer c.Close()
+
+	ctx := context.Background()
+	projectID := fmt.Sprintf("test-proj-%d", time.Now().UnixNano())
+	repo := &stubProjectRepo{counters: map[string]int64{projectID + ":loaded": 7}}
+	cnt := New(c, repo, time.Hour)
+	rdb := c.GetClient()
+	defer func() {
+		_ = c.Delete(ctx,
+			cache.BuildKey("project", projectID, "counter", "incr"),
+			cache.BuildKey("project", projectID, "counter", "set"),
+			cache.BuildKey("project", projectID, "counter", "loaded"),
+			cache.BuildKey("project", projectID, "counters"),
+		)
+	}()
+
+	if _, err := cnt.Increment(ctx, projectID, "incr"); err != nil {
+		t.Fatalf("Increment() error = %v", err)
+	}
+	if err := cnt.Set(ctx, projectID, "set", 3); err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
+	if _, err := cnt.Get(ctx, projectID, "loaded"); err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+
+	for _, name := range []string{"incr", "set", "loaded"} {
+		ttl, err := rdb.TTL(ctx, cache.BuildKey("project", projectID, "counter", name)).Result()
+		if err != nil {
+			t.Fatalf("TTL(%s) error = %v", name, err)
+		}
+		if ttl <= 0 || ttl > time.Hour {
+			t.Errorf("TTL(%s) = %v, want within (0, 1h]", name, ttl)
+		}
+	}
 }

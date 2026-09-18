@@ -62,7 +62,7 @@ website tracking configuration, and timestamps.
 
 Rules:
 
-* slugs are globally unique
+* slugs are unique among non-deleted projects (a soft-deleted slug can be reused)
 * project IDs are immutable
 * ordinary deletion is soft deletion
 * APay lifecycle transitions are accepted only through authenticated,

@@ -68,7 +68,7 @@ Project-scoped ordered event steps stored as a validated JSONB array.
 
 # 4. Identifier Rules
 
-* public project slugs are globally unique
+* public project slugs are unique among non-deleted projects
 * project and user IDs are immutable strings
 * integration event IDs are globally unique and retry-safe
 * credentials store hashes, never plaintext

@@ -135,12 +135,14 @@ func (m *Manager) CreateSession(ctx context.Context, userID string) (*Session, e
 	sessionID := generateID()
 	token := generateToken()
 	tokenHash := hashToken(token)
-	expiresAt := time.Now().Add(7 * 24 * time.Hour)
+	createdAt := time.Now()
+	expiresAt := createdAt.Add(7 * 24 * time.Hour)
 
+	// token stores the hash too so the plaintext never reaches the database.
 	_, err := m.db.Exec(ctx, `
 		INSERT INTO sessions (id, user_id, token, token_hash, expires_at, created_at)
-		VALUES ($1, $2, $3, $3, $4, $4)
-	`, sessionID, userID, tokenHash, expiresAt)
+		VALUES ($1, $2, $3, $3, $4, $5)
+	`, sessionID, userID, tokenHash, expiresAt, createdAt)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +152,7 @@ func (m *Manager) CreateSession(ctx context.Context, userID string) (*Session, e
 		UserID:    userID,
 		Token:     token,
 		ExpiresAt: expiresAt,
-		CreatedAt: expiresAt.Add(-7 * 24 * time.Hour),
+		CreatedAt: createdAt,
 	}, nil
 }
 

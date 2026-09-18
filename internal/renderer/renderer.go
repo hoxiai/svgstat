@@ -197,13 +197,8 @@ func prepareHomepage(raw string) string {
 		return ""
 	}
 
-	scheme := parsed.Scheme
-	if scheme == "" {
-		scheme = "https"
-	}
-
 	return (&url.URL{
-		Scheme: scheme,
+		Scheme: parsed.Scheme,
 		Host:   parsed.Host,
 		Path:   "/",
 	}).String()

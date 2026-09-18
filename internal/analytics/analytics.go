@@ -930,8 +930,16 @@ func (a *Analytics) GetStats(ctx context.Context, projectID, date string) (*Dail
 	parseCounts(exitsCmd.Val(), stats.Exits)
 	parseCounts(pageFlowsCmd.Val(), stats.PageFlows)
 	parseSessionSegments(sessionSegmentsCmd.Val(), stats.SessionSegments)
-	for eventName := range stats.Events {
-		stats.EventVisitors[eventName], _ = a.cache.GetClient().SCard(ctx, cache.BuildKey("project", projectID, "event_visitors", date, eventName)).Result()
+	if len(stats.Events) > 0 {
+		visitorPipe := a.cache.Pipeline()
+		visitorCmds := make(map[string]*redis.IntCmd, len(stats.Events))
+		for eventName := range stats.Events {
+			visitorCmds[eventName] = visitorPipe.SCard(ctx, cache.BuildKey("project", projectID, "event_visitors", date, eventName))
+		}
+		_, _ = visitorPipe.Exec(ctx)
+		for eventName, cmd := range visitorCmds {
+			stats.EventVisitors[eventName], _ = cmd.Result()
+		}
 	}
 	parseNestedCounts(eventSourcesCmd.Val(), stats.EventSources)
 	parseNestedCounts(eventMediumsCmd.Val(), stats.EventMediums)

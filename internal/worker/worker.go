@@ -7,13 +7,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/hoxiai/svgstat/internal/analytics"
 	"github.com/hoxiai/svgstat/internal/cache"
 	"github.com/hoxiai/svgstat/internal/project"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
 )
 
@@ -108,13 +108,13 @@ func (w *Worker) observedFlush(ctx context.Context) error {
 // FlushOnce persists today and yesterday for every project. Today is flushed
 // repeatedly so history stays fresh; yesterday is flushed so keys may expire.
 func (w *Worker) FlushOnce(ctx context.Context) error {
-	if err := w.flushCounters(ctx); err != nil {
-		log.Error().Err(err).Msg("Failed to flush counters to PostgreSQL")
-	}
-
 	projects, err := w.projectRepo.ListAll(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list projects: %w", err)
+	}
+
+	if err := w.flushCounters(ctx, projects); err != nil {
+		log.Error().Err(err).Msg("Failed to flush counters to PostgreSQL")
 	}
 
 	dates := flushDates(time.Now())
@@ -142,46 +142,50 @@ func (w *Worker) FlushOnce(ctx context.Context) error {
 	return nil
 }
 
-func (w *Worker) flushCounters(ctx context.Context) error {
+// pruneCounterScript drops a name from a project's counter registry once its
+// counter key has expired. Increments INCR before SADD, so a concurrent
+// increment either keeps the key alive or re-registers the name.
+var pruneCounterScript = redis.NewScript(`
+if redis.call('EXISTS', KEYS[1]) == 1 then return 0 end
+return redis.call('SREM', KEYS[2], ARGV[1])
+`)
+
+// flushCounters persists cumulative counters listed in each project's
+// registry. Names are used verbatim, since page_id makes them arbitrary text.
+func (w *Worker) flushCounters(ctx context.Context, projects []*project.Project) error {
 	if w.analytics == nil || w.analytics.Cache() == nil || w.projectRepo == nil {
 		return nil
 	}
 
 	rdb := w.analytics.Cache().GetClient()
-	matchPattern := cache.BuildKey("project", "*", "counter", "*")
-	var cursor uint64
 	flushed := 0
 
-	prefix := "svgstat:project:"
-
-	for {
-		keys, nextCursor, err := rdb.Scan(ctx, cursor, matchPattern, 200).Result()
+	for _, p := range projects {
+		registryKey := cache.BuildKey("project", p.ID, "counters")
+		names, err := rdb.SMembers(ctx, registryKey).Result()
 		if err != nil {
-			return fmt.Errorf("failed to scan counter keys: %w", err)
+			return fmt.Errorf("failed to read counter registry: %w", err)
+		}
+		if len(names) == 0 {
+			continue
 		}
 
-		for _, key := range keys {
-			// Skip history keys like "svgstat:project:{id}:counter:{name}:history:{date}"
-			if strings.Contains(key, ":history:") {
-				continue
-			}
-			if !strings.HasPrefix(key, prefix) {
-				continue
-			}
+		pipe := rdb.Pipeline()
+		cmds := make([]*redis.StringCmd, len(names))
+		for i, name := range names {
+			cmds[i] = pipe.Get(ctx, cache.BuildKey("project", p.ID, "counter", name))
+		}
+		if _, err := pipe.Exec(ctx); err != nil && err != redis.Nil {
+			return fmt.Errorf("failed to read counters: %w", err)
+		}
 
-			rest := strings.TrimPrefix(key, prefix)
-			counterIdx := strings.Index(rest, ":counter:")
-			if counterIdx == -1 {
+		for i, name := range names {
+			key := cache.BuildKey("project", p.ID, "counter", name)
+			valStr, err := cmds[i].Result()
+			if err == redis.Nil {
+				_ = pruneCounterScript.Run(ctx, rdb, []string{key, registryKey}, name).Err()
 				continue
 			}
-
-			projectID := rest[:counterIdx]
-			counterName := rest[counterIdx+len(":counter:"):]
-			if projectID == "" || counterName == "" {
-				continue
-			}
-
-			valStr, err := rdb.Get(ctx, key).Result()
 			if err != nil {
 				continue
 			}
@@ -191,16 +195,11 @@ func (w *Worker) flushCounters(ctx context.Context) error {
 				continue
 			}
 
-			if err := w.projectRepo.UpsertCounter(ctx, projectID, counterName, val); err != nil {
-				log.Error().Err(err).Str("project_id", projectID).Str("counter", counterName).Msg("Failed to persist counter")
+			if err := w.projectRepo.UpsertCounter(ctx, p.ID, name, val); err != nil {
+				log.Error().Err(err).Str("project_id", p.ID).Str("counter", name).Msg("Failed to persist counter")
 				continue
 			}
 			flushed++
-		}
-
-		cursor = nextCursor
-		if cursor == 0 {
-			break
 		}
 	}
 
