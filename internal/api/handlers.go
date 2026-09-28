@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"net"
 	"net/http"
 	"net/mail"
 	"net/url"
@@ -111,11 +112,15 @@ func (a *App) getAssetVersion() string {
 }
 
 func (a *App) handleSPA(w http.ResponseWriter, r *http.Request) {
-	tmpl, err := template.ParseFiles(spaTemplateFiles...)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to parse SPA templates")
-		http.Error(w, "Failed to load page: "+err.Error(), http.StatusInternalServerError)
-		return
+	tmpl := a.spaTemplate
+	if tmpl == nil {
+		var err error
+		tmpl, err = template.ParseFiles(spaTemplateFiles...)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to parse SPA templates")
+			http.Error(w, "Failed to load page: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
@@ -627,6 +632,7 @@ func parseCustomEvent(name, rawProperties, path, referrer, visitorID string) (an
 				result.Value = &number
 			}
 		case bool:
+			properties[key] = strconv.FormatBool(value)
 		case nil:
 			return analytics.EventData{}, fmt.Errorf("Event properties must be scalar values")
 		default:
@@ -818,9 +824,18 @@ func normalizeWebsiteDomain(value string) (string, error) {
 	if err != nil || parsed.Host == "" || parsed.User != nil || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
 		return "", fmt.Errorf("Invalid website domain")
 	}
-	host := strings.ToLower(parsed.Host)
+	hostname := strings.ToLower(parsed.Hostname())
+	port := parsed.Port()
+	host := hostname
+	if port != "" {
+		host = net.JoinHostPort(hostname, port)
+	}
 	if wildcard {
-		host = "*." + strings.ToLower(parsed.Hostname())
+		if port != "" {
+			host = "*." + hostname + ":" + port
+		} else {
+			host = "*." + hostname
+		}
 	}
 	if len(host) > 253 {
 		return "", fmt.Errorf("Website domain is too long")
@@ -829,15 +844,24 @@ func normalizeWebsiteDomain(value string) (string, error) {
 }
 
 func websiteOriginAllowed(origin string, domains []string) bool {
-	parsed, err := url.Parse(strings.TrimSpace(origin))
+	trimmed := strings.TrimSpace(origin)
+	if len(domains) == 0 {
+		if trimmed == "" {
+			return true
+		}
+		parsed, err := url.Parse(trimmed)
+		return err == nil && (parsed.Scheme == "http" || parsed.Scheme == "https")
+	}
+	if trimmed == "" {
+		return false
+	}
+	parsed, err := url.Parse(trimmed)
 	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 		return false
 	}
-	if len(domains) == 0 {
-		return true
-	}
 	host := strings.ToLower(parsed.Host)
 	hostname := strings.ToLower(parsed.Hostname())
+	port := parsed.Port()
 	for _, domain := range domains {
 		domain = strings.ToLower(domain)
 		if host == domain || hostname == domain {
@@ -845,8 +869,17 @@ func websiteOriginAllowed(origin string, domains []string) bool {
 		}
 		if strings.HasPrefix(domain, "*.") {
 			base := strings.TrimPrefix(domain, "*.")
-			if hostname != base && strings.HasSuffix(hostname, "."+base) {
-				return true
+			if strings.Contains(base, ":") {
+				baseHost, basePort, err := net.SplitHostPort(base)
+				if err == nil {
+					if hostname != baseHost && strings.HasSuffix(hostname, "."+baseHost) && port == basePort {
+						return true
+					}
+				}
+			} else {
+				if hostname != base && strings.HasSuffix(hostname, "."+base) {
+					return true
+				}
 			}
 		}
 	}

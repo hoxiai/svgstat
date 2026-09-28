@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"html/template"
 	"time"
 
 	"github.com/hoxiai/svgstat/internal/admin"
@@ -44,6 +45,7 @@ type App struct {
 	authLimiter    *rateLimiter
 	collectLimiter *rateLimiter
 	runtimeCancel  context.CancelFunc
+	spaTemplate    *template.Template
 }
 
 func NewApp(cfg *config.Config) (*App, error) {
@@ -111,6 +113,13 @@ func NewApp(cfg *config.Config) (*App, error) {
 		authLimiter:    newRateLimiter(10, 15*time.Minute, "auth", c),
 		collectLimiter: newRateLimiter(120, time.Minute, "collect", c),
 		runtimeCancel:  runtimeCancel,
+	}
+
+	spaTmpl, err := template.ParseFiles(spaTemplateFiles...)
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to pre-parse SPA templates at startup, will parse per-request fallback")
+	} else {
+		app.spaTemplate = spaTmpl
 	}
 
 	return app, nil

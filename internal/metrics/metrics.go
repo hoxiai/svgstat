@@ -221,13 +221,18 @@ func (s *Service) GetInstallationStatus(ctx context.Context, projectID string) (
 	}
 
 	var storedFirst *time.Time
-	var storedLast *time.Time
+	var storedLastDate *time.Time
 	if err := s.pool.QueryRow(ctx, `
-		SELECT MIN(created_at), MAX(updated_at)
+		SELECT MIN(created_at), MAX(date)
 		FROM daily_statistics
 		WHERE project_id = $1 AND (requests > 0 OR pv > 0)
-	`, projectID).Scan(&storedFirst, &storedLast); err != nil {
+	`, projectID).Scan(&storedFirst, &storedLastDate); err != nil {
 		return nil, fmt.Errorf("failed to query installation status: %w", err)
+	}
+	var storedLast *time.Time
+	if storedLastDate != nil {
+		d := storedLastDate.UTC().Add(24*time.Hour - time.Second)
+		storedLast = &d
 	}
 	firstSeenAt = earlierTime(firstSeenAt, storedFirst)
 	lastSeenAt = laterTime(lastSeenAt, storedLast)
