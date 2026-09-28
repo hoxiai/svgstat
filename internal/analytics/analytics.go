@@ -64,6 +64,16 @@ end
 return 0
 `
 
+const hourlyGuardIncrementScript = `
+local added = redis.call('SADD', KEYS[1], ARGV[1])
+if added == 1 then
+  redis.call('HINCRBY', KEYS[2], ARGV[2], 1)
+  redis.call('EXPIRE', KEYS[2], tonumber(ARGV[4]))
+end
+redis.call('EXPIRE', KEYS[1], tonumber(ARGV[3]))
+return added
+`
+
 type RequestData struct {
 	ProjectID  string `json:"projectId"`
 	IP         string `json:"ip"`
@@ -466,6 +476,10 @@ func (a *Analytics) trackRequestData(ctx context.Context, data *RequestData, cou
 	requestsKey := cache.BuildKey("project", projectID, "requests", date)
 	botsKey := cache.BuildKey("project", projectID, "bots", date)
 	uvSetKey := cache.BuildKey("project", projectID, "uvset", date)
+	ipSetKey := cache.BuildKey("project", projectID, "ipset", date)
+	hourlyPVKey := cache.BuildKey("project", projectID, "hourly", date, "pv")
+	hourlyUVKey := cache.BuildKey("project", projectID, "hourly", date, "uv")
+	hourlyIPKey := cache.BuildKey("project", projectID, "hourly", date, "ip")
 	referrerKey := cache.BuildKey("project", projectID, "referrer", date)
 	countryKey := cache.BuildKey("project", projectID, "country", date)
 	regionKey := cache.BuildKey("project", projectID, "region", date)
@@ -492,7 +506,17 @@ func (a *Analytics) trackRequestData(ctx context.Context, data *RequestData, cou
 	if data.IsBot {
 		pipe.Incr(ctx, botsKey)
 	} else if shouldCountPageview(data.IsBot, countPageview) {
+		hour := eventTime.Format("15")
+		hourlyUVGuard := cache.BuildKey("project", projectID, "hourly_uvset", date, hour)
+		hourlyIPGuard := cache.BuildKey("project", projectID, "hourly_ipset", date, hour)
+
 		pipe.Incr(ctx, pvKey)
+		pipe.HIncrBy(ctx, hourlyPVKey, hour, 1)
+		if data.IP != "" {
+			pipe.SAdd(ctx, ipSetKey, data.IP)
+			a.queueHourlyGuardIncrement(ctx, pipe, hourlyIPGuard, hourlyIPKey, data.IP, hour, 2*time.Hour)
+		}
+
 		visitorHash := a.hashVisitor(data.IP, data.UserAgent+"|"+data.VisitorID)
 		exactVisitor := a.reserveExactVisitor(ctx, projectID, date, visitorHash)
 		minute := eventTime.Format("200601021504")
@@ -505,6 +529,7 @@ func (a *Analytics) trackRequestData(ctx context.Context, data *RequestData, cou
 		if exactVisitor {
 			pipe.SAdd(ctx, realtimeVisitorsKey, visitorHash)
 			pipe.HSet(ctx, realtimeVisitsKey, visitorHash, compositeField(data.Source, data.Path))
+			a.queueHourlyGuardIncrement(ctx, pipe, hourlyUVGuard, hourlyUVKey, visitorHash, hour, 2*time.Hour)
 		}
 		pipe.Expire(ctx, realtimePVKey, 2*time.Hour)
 		pipe.Expire(ctx, realtimeVisitorsKey, 2*time.Hour)
@@ -575,6 +600,7 @@ func (a *Analytics) trackRequestData(ctx context.Context, data *RequestData, cou
 		pvKey, requestsKey, botsKey, uvSetKey, referrerKey, countryKey,
 		regionKey, cityKey, deviceKey, browserKey, pathKey, ipKey, sourceKey,
 		mediumKey, campaignKey, termKey, channelKey, siteSearchKey, visitorsKey,
+		ipSetKey, hourlyPVKey, hourlyUVKey, hourlyIPKey,
 	} {
 		pipe.Expire(ctx, key, a.keyTTL)
 	}
@@ -628,6 +654,10 @@ func (a *Analytics) queueBoundedHashIncrementSetAdd(ctx context.Context, pipe re
 		return
 	}
 	pipe.Eval(ctx, boundedHashIncrementSetAddScript, []string{hashKey, setKey}, field, member, amount, a.maxDimensionValues, int64(a.keyTTL.Seconds()))
+}
+
+func (a *Analytics) queueHourlyGuardIncrement(ctx context.Context, pipe redis.Pipeliner, guardKey, hashKey, member, hour string, guardTTL time.Duration) {
+	pipe.Eval(ctx, hourlyGuardIncrementScript, []string{guardKey, hashKey}, member, hour, int64(guardTTL.Seconds()), int64(a.keyTTL.Seconds()))
 }
 
 func shouldCountPageview(isBot, pageviewEvent bool) bool {
@@ -791,6 +821,10 @@ func (a *Analytics) GetStats(ctx context.Context, projectID, date string) (*Dail
 	requestsKey := cache.BuildKey("project", projectID, "requests", date)
 	botsKey := cache.BuildKey("project", projectID, "bots", date)
 	uvSetKey := cache.BuildKey("project", projectID, "uvset", date)
+	ipSetKey := cache.BuildKey("project", projectID, "ipset", date)
+	hourlyPVKey := cache.BuildKey("project", projectID, "hourly", date, "pv")
+	hourlyUVKey := cache.BuildKey("project", projectID, "hourly", date, "uv")
+	hourlyIPKey := cache.BuildKey("project", projectID, "hourly", date, "ip")
 	referrerKey := cache.BuildKey("project", projectID, "referrer", date)
 	countryKey := cache.BuildKey("project", projectID, "country", date)
 	regionKey := cache.BuildKey("project", projectID, "region", date)
@@ -823,6 +857,10 @@ func (a *Analytics) GetStats(ctx context.Context, projectID, date string) (*Dail
 	requestsCmd := pipe.Get(ctx, requestsKey)
 	botsCmd := pipe.Get(ctx, botsKey)
 	uvCmd := pipe.SCard(ctx, uvSetKey)
+	ipCmd := pipe.SCard(ctx, ipSetKey)
+	hourlyPVCmd := pipe.HGetAll(ctx, hourlyPVKey)
+	hourlyUVCmd := pipe.HGetAll(ctx, hourlyUVKey)
+	hourlyIPCmd := pipe.HGetAll(ctx, hourlyIPKey)
 	referrersCmd := pipe.HGetAll(ctx, referrerKey)
 	countriesCmd := pipe.HGetAll(ctx, countryKey)
 	regionsCmd := pipe.HGetAll(ctx, regionKey)
@@ -859,6 +897,7 @@ func (a *Analytics) GetStats(ctx context.Context, projectID, date string) (*Dail
 	stats := &DailyStats{
 		ProjectID:    projectID,
 		Date:         date,
+		Hourly:       make(map[string]map[string]int64),
 		Referrers:    make(map[string]int64),
 		Countries:    make(map[string]int64),
 		Regions:      make(map[string]int64),
@@ -890,6 +929,7 @@ func (a *Analytics) GetStats(ctx context.Context, projectID, date string) (*Dail
 	stats.Requests, _ = requestsCmd.Int64()
 	stats.Bots, _ = botsCmd.Int64()
 	stats.UV = uvCmd.Val()
+	stats.IP = ipCmd.Val()
 	stats.Sessions, _ = sessionsCmd.Int64()
 	stats.Bounces, _ = bouncesCmd.Int64()
 	stats.SessionDurationSeconds, _ = sessionDurationCmd.Int64()
@@ -936,8 +976,18 @@ func (a *Analytics) GetStats(ctx context.Context, projectID, date string) (*Dail
 	}
 	parseCounts(entrancesCmd.Val(), stats.Entrances)
 	parseCounts(exitsCmd.Val(), stats.Exits)
-	parseCounts(pageFlowsCmd.Val(), stats.PageFlows)
+	parsePageFlows := pageFlowsCmd.Val()
+	parseCounts(parsePageFlows, stats.PageFlows)
 	parseSessionSegments(sessionSegmentsCmd.Val(), stats.SessionSegments)
+	hourlyPV := make(map[string]int64)
+	parseCounts(hourlyPVCmd.Val(), hourlyPV)
+	hourlyUV := make(map[string]int64)
+	parseCounts(hourlyUVCmd.Val(), hourlyUV)
+	hourlyIP := make(map[string]int64)
+	parseCounts(hourlyIPCmd.Val(), hourlyIP)
+	stats.Hourly["pv"] = hourlyPV
+	stats.Hourly["uv"] = hourlyUV
+	stats.Hourly["ip"] = hourlyIP
 	if len(stats.Events) > 0 {
 		visitorPipe := a.cache.Pipeline()
 		visitorCmds := make(map[string]*redis.IntCmd, len(stats.Events))
