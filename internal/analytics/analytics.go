@@ -89,6 +89,8 @@ type DailyStats struct {
 	Date                   string                                     `json:"date"`
 	PV                     int64                                      `json:"pv"`
 	UV                     int64                                      `json:"uv"`
+	IP                     int64                                      `json:"ip"`
+	Hourly                 map[string]map[string]int64                `json:"hourly"`
 	Requests               int64                                      `json:"requests"`
 	Bots                   int64                                      `json:"bots"`
 	Referrers              map[string]int64                           `json:"referrers"`

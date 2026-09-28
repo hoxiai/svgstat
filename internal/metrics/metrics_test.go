@@ -11,8 +11,8 @@ func TestBuildTrendFillsMissingDatesAndTotals(t *testing.T) {
 	start := time.Date(2026, 8, 22, 0, 0, 0, 0, time.UTC)
 	end := time.Date(2026, 8, 24, 0, 0, 0, 0, time.UTC)
 	trend := buildTrend("project-1", 3, start, end, map[string]TrendPoint{
-		"2026-08-22": {PV: 3, UV: 2, Requests: 4, Bots: 1},
-		"2026-08-24": {PV: 5, UV: 4, Requests: 6, Bots: 1},
+		"2026-08-22": {PV: 3, UV: 2, IP: 2, Requests: 4, Bots: 1},
+		"2026-08-24": {PV: 5, UV: 4, IP: 3, Requests: 6, Bots: 1},
 	})
 
 	if len(trend.Points) != 3 || trend.Points[1].Date != "2026-08-23" {
@@ -21,17 +21,17 @@ func TestBuildTrendFillsMissingDatesAndTotals(t *testing.T) {
 	if trend.Points[1].Requests != 0 {
 		t.Fatalf("missing date requests = %d, want 0", trend.Points[1].Requests)
 	}
-	if trend.Totals.PV != 8 || trend.Totals.UV != 6 || trend.Totals.Requests != 10 || trend.Totals.Bots != 2 {
+	if trend.Totals.PV != 8 || trend.Totals.UV != 6 || trend.Totals.IP != 5 || trend.Totals.Requests != 10 || trend.Totals.Bots != 2 {
 		t.Fatalf("totals = %#v", trend.Totals)
 	}
 }
 
 func TestMaxPointKeepsMonotonicTodayValues(t *testing.T) {
 	point := maxPoint(
-		TrendPoint{PV: 10, UV: 8, Requests: 12, Bots: 2},
-		TrendPoint{Date: "2026-08-24", PV: 9, UV: 9, Requests: 15, Bots: 1},
+		TrendPoint{PV: 10, UV: 8, IP: 7, Requests: 12, Bots: 2},
+		TrendPoint{Date: "2026-08-24", PV: 9, UV: 9, IP: 8, Requests: 15, Bots: 1},
 	)
-	if point.PV != 10 || point.UV != 9 || point.Requests != 15 || point.Bots != 2 {
+	if point.PV != 10 || point.UV != 9 || point.IP != 8 || point.Requests != 15 || point.Bots != 2 {
 		t.Fatalf("maxPoint() = %#v", point)
 	}
 }
@@ -55,12 +55,15 @@ func TestInstallationTimeMerging(t *testing.T) {
 }
 
 func TestPeriodChanges(t *testing.T) {
-	changes := periodChanges(PeriodTotals{PV: 150, UV: 50}, PeriodTotals{PV: 100, UV: 100})
+	changes := periodChanges(PeriodTotals{PV: 150, UV: 50, IP: 40}, PeriodTotals{PV: 100, UV: 100, IP: 20})
 	if changes.PV == nil || *changes.PV != 50 {
 		t.Fatalf("PV change = %v, want 50", changes.PV)
 	}
 	if changes.UV == nil || *changes.UV != -50 {
 		t.Fatalf("UV change = %v, want -50", changes.UV)
+	}
+	if changes.IP == nil || *changes.IP != 100 {
+		t.Fatalf("IP change = %v, want 100", changes.IP)
 	}
 	if changes.Requests != nil {
 		t.Fatalf("zero baseline change = %v, want nil", changes.Requests)
@@ -69,10 +72,10 @@ func TestPeriodChanges(t *testing.T) {
 
 func TestMaxDailyStatsMergesTodayWithoutDoubleCounting(t *testing.T) {
 	merged := maxDailyStats(
-		&analytics.DailyStats{PV: 10, Paths: map[string]int64{"/": 10}, Sources: map[string]int64{"direct": 4}},
-		&analytics.DailyStats{PV: 12, Paths: map[string]int64{"/": 9, "/docs": 2}, Sources: map[string]int64{"direct": 5}},
+		&analytics.DailyStats{PV: 10, IP: 5, Paths: map[string]int64{"/": 10}, Sources: map[string]int64{"direct": 4}},
+		&analytics.DailyStats{PV: 12, IP: 8, Paths: map[string]int64{"/": 9, "/docs": 2}, Sources: map[string]int64{"direct": 5}},
 	)
-	if merged.PV != 12 || merged.Paths["/"] != 10 || merged.Paths["/docs"] != 2 || merged.Sources["direct"] != 5 {
+	if merged.PV != 12 || merged.IP != 8 || merged.Paths["/"] != 10 || merged.Paths["/docs"] != 2 || merged.Sources["direct"] != 5 {
 		t.Fatalf("merged stats = %#v", merged)
 	}
 }

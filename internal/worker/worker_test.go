@@ -73,8 +73,8 @@ func TestDailyStatsArgs(t *testing.T) {
 		t.Fatalf("dailyStatsArgs() error = %v", err)
 	}
 
-	if len(args) != 39 {
-		t.Fatalf("dailyStatsArgs() returned %d args, want 39", len(args))
+	if len(args) != 41 {
+		t.Fatalf("dailyStatsArgs() returned %d args, want 41", len(args))
 	}
 	if terms, ok := args[36].([]byte); !ok || string(terms) != `{"svg badge":2}` {
 		t.Errorf("args[36] (terms) = %v, want {\"svg badge\":2}", args[36])
@@ -133,7 +133,7 @@ func TestDailyStatsArgsEmptyMaps(t *testing.T) {
 	}
 
 	// JSONB columns must receive {} rather than null so queries can rely on it.
-	jsonIndexes := []int{7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 32, 33, 34, 35, 36, 37, 38}
+	jsonIndexes := []int{7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 32, 33, 34, 35, 36, 37, 38, 40}
 	for _, i := range jsonIndexes {
 		raw, ok := args[i].([]byte)
 		if !ok {
@@ -154,5 +154,42 @@ func TestHasTrafficIncludesWebsitePageviews(t *testing.T) {
 	}
 	if !hasTraffic(&analytics.DailyStats{Events: map[string]int64{"signup": 1}}) {
 		t.Fatal("event-only statistics were treated as empty traffic")
+	}
+}
+
+func TestDailyStatsArgs_IncludesIPAndHourly(t *testing.T) {
+	stats := &analytics.DailyStats{
+		ProjectID: "proj-1",
+		Date:      "2026-09-28",
+		PV:        100,
+		UV:        50,
+		IP:        40,
+		Hourly: map[string]map[string]int64{
+			"pv": {"00": 10, "01": 20},
+			"uv": {"00": 5, "01": 15},
+			"ip": {"00": 4, "01": 12},
+		},
+	}
+	args, err := dailyStatsArgs(stats)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Check that IP and Hourly are present and correctly serialized
+	if len(args) != 41 { // 39 prior columns + 2 new columns
+		t.Fatalf("expected 41 args, got %d", len(args))
+	}
+	if args[39] != int64(40) {
+		t.Errorf("expected arg[39] (ip) to be 40, got %v", args[39])
+	}
+	var hourly map[string]map[string]int64
+	hourlyRaw, ok := args[40].([]byte)
+	if !ok {
+		t.Fatalf("args[40] (hourly) is %T, want []byte", args[40])
+	}
+	if err := json.Unmarshal(hourlyRaw, &hourly); err != nil {
+		t.Fatalf("failed to unmarshal hourly: %v", err)
+	}
+	if hourly["pv"]["00"] != 10 || hourly["ip"]["01"] != 12 {
+		t.Errorf("hourly = %v, want matching values", hourly)
 	}
 }

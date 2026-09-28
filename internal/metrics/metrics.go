@@ -27,6 +27,7 @@ type TrendPoint struct {
 	Date     string `json:"date"`
 	PV       int64  `json:"pv"`
 	UV       int64  `json:"uv"`
+	IP       int64  `json:"ip"`
 	Requests int64  `json:"requests"`
 	Bots     int64  `json:"bots"`
 }
@@ -50,6 +51,7 @@ type InstallationStatus struct {
 type PeriodTotals struct {
 	PV       int64 `json:"pv"`
 	UV       int64 `json:"uv"`
+	IP       int64 `json:"ip"`
 	Requests int64 `json:"requests"`
 	Bots     int64 `json:"bots"`
 }
@@ -57,6 +59,7 @@ type PeriodTotals struct {
 type PeriodChanges struct {
 	PV       *float64 `json:"pv"`
 	UV       *float64 `json:"uv"`
+	IP       *float64 `json:"ip"`
 	Requests *float64 `json:"requests"`
 	Bots     *float64 `json:"bots"`
 }
@@ -171,7 +174,7 @@ func (s *Service) GetTrend(ctx context.Context, projectID string, days int, now 
 	start := end.AddDate(0, 0, -(days - 1))
 
 	rows, err := s.pool.Query(ctx, `
-		SELECT date, pv, uv, requests, bots
+		SELECT date, pv, uv, ip, requests, bots
 		FROM daily_statistics
 		WHERE project_id = $1 AND date BETWEEN $2 AND $3
 		ORDER BY date ASC
@@ -185,7 +188,7 @@ func (s *Service) GetTrend(ctx context.Context, projectID string, days int, now 
 	for rows.Next() {
 		var date time.Time
 		var point TrendPoint
-		if err := rows.Scan(&date, &point.PV, &point.UV, &point.Requests, &point.Bots); err != nil {
+		if err := rows.Scan(&date, &point.PV, &point.UV, &point.IP, &point.Requests, &point.Bots); err != nil {
 			return nil, fmt.Errorf("failed to scan historical statistics: %w", err)
 		}
 		point.Date = date.UTC().Format("2006-01-02")
@@ -199,7 +202,7 @@ func (s *Service) GetTrend(ctx context.Context, projectID string, days int, now 
 		if today, err := s.live.GetTodayStats(ctx, projectID); err == nil && today != nil {
 			date := end.Format("2006-01-02")
 			stored[date] = maxPoint(stored[date], TrendPoint{
-				Date: date, PV: today.PV, UV: today.UV, Requests: today.Requests, Bots: today.Bots,
+				Date: date, PV: today.PV, UV: today.UV, IP: today.IP, Requests: today.Requests, Bots: today.Bots,
 			})
 		}
 	}
@@ -259,7 +262,7 @@ func (s *Service) GetAnalysis(ctx context.Context, projectID string, days int, n
 		Breakdowns: emptyBreakdowns(),
 	}
 	rows, err := s.pool.Query(ctx, `
-		SELECT date, pv, uv, requests, bots, paths, referrers, countries, devices, browsers, sources, mediums, campaigns,
+		SELECT date, pv, uv, ip, requests, bots, paths, referrers, countries, devices, browsers, sources, mediums, campaigns,
 			terms, channels, site_searches
 		FROM daily_statistics
 		WHERE project_id = $1 AND date BETWEEN $2 AND $3
@@ -272,7 +275,7 @@ func (s *Service) GetAnalysis(ctx context.Context, projectID string, days int, n
 	for rows.Next() {
 		var date time.Time
 		var stats analytics.DailyStats
-		if err := rows.Scan(&date, &stats.PV, &stats.UV, &stats.Requests, &stats.Bots,
+		if err := rows.Scan(&date, &stats.PV, &stats.UV, &stats.IP, &stats.Requests, &stats.Bots,
 			&stats.Paths, &stats.Referrers, &stats.Countries, &stats.Devices, &stats.Browsers,
 			&stats.Sources, &stats.Mediums, &stats.Campaigns,
 			&stats.Terms, &stats.Channels, &stats.SiteSearches); err != nil {
@@ -749,6 +752,7 @@ func emptyBreakdowns() map[string]map[string]int64 {
 func addPeriodTotals(target *PeriodTotals, stats *analytics.DailyStats) {
 	target.PV += stats.PV
 	target.UV += stats.UV
+	target.IP += stats.IP
 	target.Requests += stats.Requests
 	target.Bots += stats.Bots
 }
@@ -771,6 +775,7 @@ func periodChanges(current, previous PeriodTotals) PeriodChanges {
 	return PeriodChanges{
 		PV:       percentageChange(current.PV, previous.PV),
 		UV:       percentageChange(current.UV, previous.UV),
+		IP:       percentageChange(current.IP, previous.IP),
 		Requests: percentageChange(current.Requests, previous.Requests),
 		Bots:     percentageChange(current.Bots, previous.Bots),
 	}
@@ -826,6 +831,7 @@ func maxDailyStats(stored, live *analytics.DailyStats) *analytics.DailyStats {
 	merged := *live
 	merged.PV = maxInt64(stored.PV, live.PV)
 	merged.UV = maxInt64(stored.UV, live.UV)
+	merged.IP = maxInt64(stored.IP, live.IP)
 	merged.Requests = maxInt64(stored.Requests, live.Requests)
 	merged.Bots = maxInt64(stored.Bots, live.Bots)
 	merged.Paths = maxMap(stored.Paths, live.Paths)
@@ -890,6 +896,7 @@ func buildTrend(projectID string, days int, start, end time.Time, stored map[str
 		trend.Points = append(trend.Points, point)
 		trend.Totals.PV += point.PV
 		trend.Totals.UV += point.UV
+		trend.Totals.IP += point.IP
 		trend.Totals.Requests += point.Requests
 		trend.Totals.Bots += point.Bots
 	}
@@ -901,6 +908,7 @@ func maxPoint(left, right TrendPoint) TrendPoint {
 		Date:     right.Date,
 		PV:       maxInt64(left.PV, right.PV),
 		UV:       maxInt64(left.UV, right.UV),
+		IP:       maxInt64(left.IP, right.IP),
 		Requests: maxInt64(left.Requests, right.Requests),
 		Bots:     maxInt64(left.Bots, right.Bots),
 	}

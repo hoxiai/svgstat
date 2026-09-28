@@ -238,11 +238,14 @@ func (w *Worker) upsertDailyStats(ctx context.Context, stats *analytics.DailySta
 			audience_segments, event_segments, funnel_segments,
 			sessions, bounces, session_duration_seconds, session_pageviews,
 			entrances, exits, page_flows, session_segments,
-			terms, channels, site_searches
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39)
+			terms, channels, site_searches,
+			ip, hourly
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41)
 		ON CONFLICT (project_id, date) DO UPDATE SET
 			pv = EXCLUDED.pv,
 			uv = EXCLUDED.uv,
+			ip = EXCLUDED.ip,
+			hourly = EXCLUDED.hourly,
 			requests = EXCLUDED.requests,
 			bots = EXCLUDED.bots,
 			referrers = EXCLUDED.referrers,
@@ -443,6 +446,10 @@ func dailyStatsArgs(stats *analytics.DailyStats) ([]interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal site searches: %w", err)
 	}
+	hourly, err := json.Marshal(nonNilHourly(stats.Hourly))
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal hourly: %w", err)
+	}
 
 	return []interface{}{
 		newID(), stats.ProjectID, stats.Date,
@@ -454,7 +461,15 @@ func dailyStatsArgs(stats *analytics.DailyStats) ([]interface{}, error) {
 		stats.Sessions, stats.Bounces, stats.SessionDurationSeconds, stats.SessionPageviews,
 		entrances, exits, pageFlows, sessionSegments,
 		terms, channels, siteSearches,
+		stats.IP, hourly,
 	}, nil
+}
+
+func nonNilHourly(values map[string]map[string]int64) map[string]map[string]int64 {
+	if values == nil {
+		return map[string]map[string]int64{}
+	}
+	return values
 }
 
 func nonNilCounts(values map[string]int64) map[string]int64 {
