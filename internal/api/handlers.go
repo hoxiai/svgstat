@@ -1239,6 +1239,28 @@ func (a *App) handleGetProjectRealtime(w http.ResponseWriter, r *http.Request) {
 	a.jsonSuccess(w, stats)
 }
 
+func (a *App) handleGetProjectTodayOverview(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value("user").(*auth.User)
+	id := mux.Vars(r)["id"]
+	p, err := a.projectRepo.GetByIDAndUser(r.Context(), id, user.ID)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to get project")
+		a.jsonError(w, "Failed to get project", http.StatusInternalServerError)
+		return
+	}
+	if p == nil {
+		a.jsonError(w, "Project not found", http.StatusNotFound)
+		return
+	}
+	overview, err := a.metrics.GetTodayOverview(r.Context(), id, time.Now())
+	if err != nil {
+		log.Error().Err(err).Str("project_id", id).Msg("Failed to get today overview")
+		a.jsonError(w, "Failed to get today overview", http.StatusInternalServerError)
+		return
+	}
+	a.jsonSuccess(w, overview)
+}
+
 func (a *App) handleGetProjectAnalysis(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value("user").(*auth.User)
 	id := mux.Vars(r)["id"]

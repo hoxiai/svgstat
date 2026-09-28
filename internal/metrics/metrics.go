@@ -7,10 +7,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/hoxiai/svgstat/internal/analytics"
 )
+
+type dbQuerier interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
 
 type liveStatsReader interface {
 	GetTodayStats(ctx context.Context, projectID string) (*analytics.DailyStats, error)
@@ -19,7 +25,7 @@ type liveStatsReader interface {
 }
 
 type Service struct {
-	pool *pgxpool.Pool
+	pool dbQuerier
 	live liveStatsReader
 }
 
@@ -163,6 +169,14 @@ type FunnelSegment struct {
 }
 
 func New(pool *pgxpool.Pool, live liveStatsReader) *Service {
+	var q dbQuerier
+	if pool != nil {
+		q = pool
+	}
+	return &Service{pool: q, live: live}
+}
+
+func newForTest(pool dbQuerier, live liveStatsReader) *Service {
 	return &Service{pool: pool, live: live}
 }
 

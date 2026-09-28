@@ -38,6 +38,7 @@ func (a *App) SetupRoutes() *mux.Router {
 	projects.HandleFunc("/{id}/stats", a.handleGetProjectStats).Methods("GET")
 	projects.HandleFunc("/{id}/stats/trend", a.handleGetProjectTrend).Methods("GET")
 	projects.HandleFunc("/{id}/stats/realtime", a.handleGetProjectRealtime).Methods("GET")
+	projects.HandleFunc("/{id}/stats/overview", a.handleGetProjectTodayOverview).Methods("GET")
 	projects.HandleFunc("/{id}/analysis", a.handleGetProjectAnalysis).Methods("GET")
 	projects.HandleFunc("/{id}/session-quality", a.handleGetProjectSessionQuality).Methods("GET")
 	projects.HandleFunc("/{id}/events", a.handleGetProjectEvents).Methods("GET")

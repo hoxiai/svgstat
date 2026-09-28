@@ -1,8 +1,13 @@
 package metrics
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/hoxiai/svgstat/internal/analytics"
 )
@@ -233,3 +238,265 @@ func TestTrimBreakdownsKeepsMoreChannels(t *testing.T) {
 		t.Fatalf("channels kept %d entries, want all 30 (channel drill-down needs pairs beyond the top 20)", len(breakdowns["channels"]))
 	}
 }
+
+type mockLiveStatsReader struct {
+	todayStats *analytics.DailyStats
+	err        error
+}
+
+func (m *mockLiveStatsReader) GetTodayStats(ctx context.Context, projectID string) (*analytics.DailyStats, error) {
+	return m.todayStats, m.err
+}
+
+func (m *mockLiveStatsReader) GetInstallationTimes(ctx context.Context, projectID string) (*analytics.InstallationTimes, error) {
+	return nil, nil
+}
+
+func (m *mockLiveStatsReader) GetRealtimeStats(ctx context.Context, projectID string, now time.Time) (*analytics.RealtimeStats, error) {
+	return nil, nil
+}
+
+type mockRow struct {
+	scanFn func(dest ...any) error
+}
+
+func (m *mockRow) Scan(dest ...any) error {
+	return m.scanFn(dest...)
+}
+
+type mockDB struct {
+	queryRowFn func(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+func (m *mockDB) Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
+	return nil, nil
+}
+
+func (m *mockDB) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
+	if m.queryRowFn != nil {
+		return m.queryRowFn(ctx, sql, args...)
+	}
+	return &mockRow{scanFn: func(dest ...any) error { return pgx.ErrNoRows }}
+}
+
+func TestGetTodayOverview_CalculatesHeroAndHourly(t *testing.T) {
+	now := time.Date(2026, 9, 28, 14, 35, 0, 0, time.UTC)
+	projectID := "test-proj-1"
+
+	// Live stats for today (hour 14)
+	todayHourlyPV := map[string]int64{}
+	todayHourlyUV := map[string]int64{}
+	todayHourlyIP := map[string]int64{}
+	for h := 0; h <= 14; h++ {
+		key := fmt.Sprintf("%02d", h)
+		todayHourlyPV[key] = 10
+		todayHourlyUV[key] = 4
+		todayHourlyIP[key] = 3
+	}
+	// Add hour 14 specific
+	todayHourlyPV["14"] = 10
+	todayHourlyUV["14"] = 4
+	todayHourlyIP["14"] = 8
+
+	mockLive := &mockLiveStatsReader{
+		todayStats: &analytics.DailyStats{
+			ProjectID: projectID,
+			Date:      "2026-09-28",
+			PV:        150,
+			UV:        60,
+			IP:        50,
+			Hourly: map[string]map[string]int64{
+				"pv": todayHourlyPV,
+				"uv": todayHourlyUV,
+				"ip": todayHourlyIP,
+			},
+		},
+	}
+
+	// Yesterday stats in PostgreSQL (full 24h)
+	yesterdayHourlyPV := map[string]int64{}
+	yesterdayHourlyUV := map[string]int64{}
+	yesterdayHourlyIP := map[string]int64{}
+	for h := 0; h < 24; h++ {
+		key := fmt.Sprintf("%02d", h)
+		yesterdayHourlyPV[key] = 8
+		yesterdayHourlyUV[key] = 4
+		yesterdayHourlyIP[key] = 3
+	}
+	// For hours 00..14 (15 hours):
+	// PV: 15 * 8 = 120 (let's set sum to 100 by tweaking: 10 hours of 10 = 100)
+	for h := 0; h < 24; h++ {
+		key := fmt.Sprintf("%02d", h)
+		if h <= 14 {
+			// Hours 00..14 sum:
+			// PV: 100 total
+			yesterdayHourlyPV[key] = 6
+			yesterdayHourlyUV[key] = 3
+			yesterdayHourlyIP[key] = 2
+		} else {
+			// Hours 15..23 sum:
+			yesterdayHourlyPV[key] = 10
+			yesterdayHourlyUV[key] = 5
+			yesterdayHourlyIP[key] = 4
+		}
+	}
+	// Customize exact totals for hours 00..14:
+	// Set hour 00 to make exact totals:
+	// PV sum 00..14: 14 * 6 = 84 + 16 = 100
+	yesterdayHourlyPV["00"] = 16
+	// UV sum 00..14: 14 * 3 = 42 + 8 = 50
+	yesterdayHourlyUV["00"] = 8
+	// IP sum 00..14: 14 * 2 = 28 + 12 = 40
+	yesterdayHourlyIP["00"] = 12
+
+	yesterdayHourlyJSON, err := json.Marshal(map[string]map[string]int64{
+		"pv": yesterdayHourlyPV,
+		"uv": yesterdayHourlyUV,
+		"ip": yesterdayHourlyIP,
+	})
+	if err != nil {
+		t.Fatalf("marshal error: %v", err)
+	}
+
+	mockDBInstance := &mockDB{
+		queryRowFn: func(ctx context.Context, sql string, args ...any) pgx.Row {
+			if len(args) >= 2 && args[0] == projectID && args[1] == "2026-09-27" {
+				return &mockRow{
+					scanFn: func(dest ...any) error {
+						*dest[0].(*int64) = 200 // yesterdayFull PV
+						*dest[1].(*int64) = 100 // yesterdayFull UV
+						*dest[2].(*int64) = 80  // yesterdayFull IP
+						*dest[3].(*[]byte) = yesterdayHourlyJSON
+						return nil
+					},
+				}
+			}
+			return &mockRow{scanFn: func(dest ...any) error { return pgx.ErrNoRows }}
+		},
+	}
+
+	service := newForTest(mockDBInstance, mockLive)
+	overview, err := service.GetTodayOverview(context.Background(), projectID, now)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if overview.ProjectID != projectID {
+		t.Errorf("ProjectID = %q, want %q", overview.ProjectID, projectID)
+	}
+	if overview.Date != "2026-09-28" {
+		t.Errorf("Date = %q, want 2026-09-28", overview.Date)
+	}
+	if overview.CurrentHour != 14 {
+		t.Errorf("CurrentHour = %d, want 14", overview.CurrentHour)
+	}
+	if overview.PV != 150 || overview.UV != 60 || overview.IP != 50 {
+		t.Errorf("Today metrics = PV:%d UV:%d IP:%d, want 150, 60, 50", overview.PV, overview.UV, overview.IP)
+	}
+	if overview.AvgPageviewsPerUser != 2.5 {
+		t.Errorf("AvgPageviewsPerUser = %v, want 2.5", overview.AvgPageviewsPerUser)
+	}
+
+	// Yesterday full day
+	if overview.YesterdayFull.PV != 200 || overview.YesterdayFull.UV != 100 || overview.YesterdayFull.IP != 80 {
+		t.Errorf("YesterdayFull = %#v, want PV:200 UV:100 IP:80", overview.YesterdayFull)
+	}
+
+	// Yesterday same period (00..14)
+	if overview.YesterdaySamePeriod.PV != 100 || overview.YesterdaySamePeriod.UV != 50 || overview.YesterdaySamePeriod.IP != 40 {
+		t.Errorf("YesterdaySamePeriod = %#v, want PV:100 UV:50 IP:40", overview.YesterdaySamePeriod)
+	}
+
+	// Changes: (today - yesterday_same_period) / yesterday_same_period * 100
+	// PV: (150 - 100) / 100 * 100 = +50.0%
+	// UV: (60 - 50) / 50 * 100 = +20.0%
+	// IP: (50 - 40) / 40 * 100 = +25.0%
+	if overview.Changes.PV == nil || *overview.Changes.PV != 50.0 {
+		t.Errorf("Changes.PV = %v, want 50.0", overview.Changes.PV)
+	}
+	if overview.Changes.UV == nil || *overview.Changes.UV != 20.0 {
+		t.Errorf("Changes.UV = %v, want 20.0", overview.Changes.UV)
+	}
+	if overview.Changes.IP == nil || *overview.Changes.IP != 25.0 {
+		t.Errorf("Changes.IP = %v, want 25.0", overview.Changes.IP)
+	}
+
+	// TodayHourly should contain hours 00..14 (15 hours)
+	if len(overview.TodayHourly) != 15 {
+		t.Errorf("len(TodayHourly) = %d, want 15 (hours 00..14)", len(overview.TodayHourly))
+	}
+	if _, exists := overview.TodayHourly["15"]; exists {
+		t.Errorf("TodayHourly should not contain hour 15")
+	}
+	if pt, exists := overview.TodayHourly["14"]; !exists || pt.IP != 8 {
+		t.Errorf("TodayHourly[14] = %#v, want IP: 8", pt)
+	}
+
+	// YesterdayHourly should contain hours 00..23 (24 hours)
+	if len(overview.YesterdayHourly) != 24 {
+		t.Errorf("len(YesterdayHourly) = %d, want 24", len(overview.YesterdayHourly))
+	}
+	if pt, exists := overview.YesterdayHourly["00"]; !exists || pt.PV != 16 || pt.UV != 8 || pt.IP != 12 {
+		t.Errorf("YesterdayHourly[00] = %#v, want PV:16 UV:8 IP:12", pt)
+	}
+}
+
+func TestGetTodayOverview_HandlesMissingYesterdayRowAndZeroUV(t *testing.T) {
+	now := time.Date(2026, 9, 28, 5, 0, 0, 0, time.UTC)
+	projectID := "test-proj-zero"
+
+	mockLive := &mockLiveStatsReader{
+		todayStats: &analytics.DailyStats{
+			ProjectID: projectID,
+			Date:      "2026-09-28",
+			PV:        10,
+			UV:        0,
+			IP:        5,
+			Hourly: map[string]map[string]int64{
+				"pv": {"05": 10},
+			},
+		},
+	}
+
+	mockDBInstance := &mockDB{
+		queryRowFn: func(ctx context.Context, sql string, args ...any) pgx.Row {
+			return &mockRow{scanFn: func(dest ...any) error { return pgx.ErrNoRows }}
+		},
+	}
+
+	service := newForTest(mockDBInstance, mockLive)
+	overview, err := service.GetTodayOverview(context.Background(), projectID, now)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if overview.AvgPageviewsPerUser != 0 {
+		t.Errorf("AvgPageviewsPerUser = %v, want 0 when UV=0", overview.AvgPageviewsPerUser)
+	}
+	if overview.YesterdayFull.PV != 0 || overview.YesterdaySamePeriod.PV != 0 {
+		t.Errorf("YesterdayFull/SamePeriod should be 0, got %#v, %#v", overview.YesterdayFull, overview.YesterdaySamePeriod)
+	}
+	if overview.Changes.PV != nil || overview.Changes.UV != nil || overview.Changes.IP != nil {
+		t.Errorf("Changes should all be nil when baseline is 0, got %#v", overview.Changes)
+	}
+	if len(overview.TodayHourly) != 6 { // hours 00..05 = 6
+		t.Errorf("len(TodayHourly) = %d, want 6", len(overview.TodayHourly))
+	}
+	if len(overview.YesterdayHourly) != 24 {
+		t.Errorf("len(YesterdayHourly) = %d, want 24", len(overview.YesterdayHourly))
+	}
+}
+
+func TestGetTodayOverview_PropagatesLiveError(t *testing.T) {
+	now := time.Date(2026, 9, 28, 5, 0, 0, 0, time.UTC)
+	mockLive := &mockLiveStatsReader{
+		err: fmt.Errorf("redis connection timeout"),
+	}
+	service := newForTest(nil, mockLive)
+	_, err := service.GetTodayOverview(context.Background(), "test-proj", now)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+
