@@ -195,3 +195,38 @@ func TestBuildWebQualitySummarizesVitalsAndErrors(t *testing.T) {
 		t.Fatalf("onlyErrors = %#v", onlyErrors)
 	}
 }
+
+func TestAnalysisBreakdownsIncludeVisitAttribution(t *testing.T) {
+	breakdowns := emptyBreakdowns()
+	var totals PeriodTotals
+	day := &analytics.DailyStats{
+		Terms:        map[string]int64{"svg badge": 2},
+		Channels:     map[string]int64{"organic\x1fgoogle": 3},
+		SiteSearches: map[string]int64{"pricing": 4},
+	}
+	addPeriodStats(&totals, breakdowns, day)
+	addPeriodStats(&totals, breakdowns, day)
+	if breakdowns["terms"]["svg badge"] != 4 || breakdowns["channels"]["organic\x1fgoogle"] != 6 || breakdowns["siteSearches"]["pricing"] != 8 {
+		t.Fatalf("breakdowns = %#v", breakdowns)
+	}
+
+	merged := maxDailyStats(
+		&analytics.DailyStats{Terms: map[string]int64{"a": 3}, Channels: map[string]int64{"x": 1}, SiteSearches: map[string]int64{"q": 5}},
+		&analytics.DailyStats{Terms: map[string]int64{"a": 2}, Channels: map[string]int64{"x": 4}, SiteSearches: map[string]int64{"q": 1}},
+	)
+	if merged.Terms["a"] != 3 || merged.Channels["x"] != 4 || merged.SiteSearches["q"] != 5 {
+		t.Fatalf("merged = %#v", merged)
+	}
+}
+
+func TestTrimBreakdownsKeepsMoreChannels(t *testing.T) {
+	channels := map[string]int64{}
+	for i := 0; i < 30; i++ {
+		channels[string(rune('a'+i))] = int64(i + 1)
+	}
+	breakdowns := map[string]map[string]int64{"channels": channels}
+	trimBreakdowns(breakdowns, 20)
+	if len(breakdowns["channels"]) != 30 {
+		t.Fatalf("channels kept %d entries, want all 30 (channel drill-down needs pairs beyond the top 20)", len(breakdowns["channels"]))
+	}
+}

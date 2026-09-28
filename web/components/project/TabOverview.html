@@ -20,6 +20,30 @@
             <div class="rounded-lg bg-purple-50 p-4"><div class="text-3xl font-bold text-purple-600" x-text="projectRealtime.pv30 || 0"></div><div class="text-sm text-gray-600" x-text="t('pageviews30m')"></div></div>
             <div class="rounded-lg bg-blue-50 p-4"><div class="text-3xl font-bold text-blue-600" x-text="projectRealtime.visitors30 || 0"></div><div class="text-sm text-gray-600" x-text="t('visitors30m')"></div></div>
         </div>
+        <div class="grid md:grid-cols-2 gap-6 mt-5" x-show="getTotalCount(projectRealtime.sources) > 0 || getTotalCount(projectRealtime.pages) > 0">
+            <div>
+                <h4 class="text-sm font-medium text-gray-800 mb-3" x-text="t('realtimeSources')"></h4>
+                <div class="space-y-2">
+                    <template x-for="entry in getSortedEntries(projectRealtime.sources, 5)" :key="entry[0]">
+                        <div class="flex items-center justify-between gap-3 text-sm">
+                            <span class="text-gray-700 truncate" x-text="entry[0]"></span>
+                            <span class="text-gray-500 font-medium shrink-0" x-text="entry[1]"></span>
+                        </div>
+                    </template>
+                </div>
+            </div>
+            <div>
+                <h4 class="text-sm font-medium text-gray-800 mb-3" x-text="t('realtimePages')"></h4>
+                <div class="space-y-2">
+                    <template x-for="entry in getSortedEntries(projectRealtime.pages, 5)" :key="entry[0]">
+                        <div class="flex items-center justify-between gap-3 text-sm">
+                            <span class="text-gray-700 truncate font-mono" :title="entry[0]" x-text="entry[0]"></span>
+                            <span class="text-gray-500 font-medium shrink-0" x-text="entry[1]"></span>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- 今日概览 -->
@@ -108,6 +132,53 @@
         </div>
     </div>
 
+    <!-- 流量来源：渠道 → 来源（按访问计） -->
+    <div class="bg-white rounded-xl shadow-sm p-6 stat-card">
+        <div class="flex items-start justify-between gap-4 mb-4">
+            <div>
+                <h3 class="font-semibold text-gray-900" x-text="t('trafficSources')"></h3>
+                <p class="text-sm text-gray-500 mt-1" x-text="t('visitSourcesHint')"></p>
+            </div>
+            <div class="flex items-center gap-1.5 text-xs text-gray-500" x-show="getTotalCount(getChannelSources()) > 8">
+                    <button @click="changeBreakdownPage('channelSources', -1, getChannelSources())" :disabled="(breakdownPages.channelSources || 1) <= 1" class="p-1 rounded hover:bg-gray-100 disabled:opacity-30">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                    </button>
+                    <span x-text="`${breakdownPages.channelSources || 1} / ${getTotalPages(getChannelSources(), 8)}`"></span>
+                    <button @click="changeBreakdownPage('channelSources', 1, getChannelSources())" :disabled="(breakdownPages.channelSources || 1) >= getTotalPages(getChannelSources(), 8)" class="p-1 rounded hover:bg-gray-100 disabled:opacity-30">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    </button>
+                </div>
+        </div>
+        <div class="flex flex-wrap gap-2 mb-5">
+            <button @click="selectSourceChannel('')" class="rounded-full border px-3 py-1 text-sm transition-colors"
+                :class="sourceChannel === '' ? 'border-purple-600 bg-purple-600 text-white font-medium' : 'border-gray-200 bg-white text-gray-600 hover:border-purple-300'">
+                <span x-text="t('allChannels')"></span>
+                <span class="ml-1 opacity-75" x-text="Object.values(projectAnalysis.breakdowns.mediums || {}).reduce((sum, count) => sum + count, 0)"></span>
+            </button>
+            <template x-for="entry in getSortedEntries(projectAnalysis.breakdowns.mediums)" :key="entry[0]">
+                <button @click="selectSourceChannel(entry[0])" class="rounded-full border px-3 py-1 text-sm transition-colors"
+                    :class="sourceChannel === entry[0] ? 'border-purple-600 bg-purple-600 text-white font-medium' : 'border-gray-200 bg-white text-gray-600 hover:border-purple-300'">
+                    <span x-text="mediumLabel(entry[0])"></span>
+                    <span class="ml-1 opacity-75" x-text="entry[1]"></span>
+                </button>
+            </template>
+        </div>
+        <div class="grid sm:grid-cols-2 gap-x-8 gap-y-3" x-show="getPaginatedEntries(getChannelSources(), breakdownPages.channelSources || 1, 8).length > 0">
+            <template x-for="entry in getPaginatedEntries(getChannelSources(), breakdownPages.channelSources || 1, 8)" :key="entry[0]">
+                <div class="flex items-center justify-between gap-4">
+                    <span class="text-gray-700 truncate flex-1 text-sm" x-text="entry[0]"></span>
+                    <div class="flex items-center space-x-2 shrink-0">
+                        <div class="w-28 bg-gray-200 rounded-full h-2">
+                            <div class="bg-indigo-500 h-2 rounded-full" :style="getBarStyle(entry[1], getChannelSources())"></div>
+                        </div>
+                        <span class="text-sm text-gray-500 min-w-8 text-right font-medium" x-text="entry[1]"></span>
+                    </div>
+                </div>
+            </template>
+        </div>
+        <p x-show="getTotalCount(getChannelSources()) === 0" class="text-gray-500 text-center py-4 text-sm" x-text="t('noData')"></p>
+    </div>
+
     <!-- 核心流量构成 (带分页) -->
     <div class="grid md:grid-cols-2 gap-6">
         <!-- Top Referrers -->
@@ -168,6 +239,73 @@
                 </template>
             </div>
             <p x-show="getTotalCount(projectAnalysis.breakdowns.paths) === 0" class="text-gray-500 text-center py-4 text-sm" x-text="t('noData')"></p>
+        </div>
+
+
+        <!-- searchKeywords -->
+        <div class="bg-white rounded-xl shadow-sm p-6 stat-card">
+            <div class="flex items-start justify-between gap-2 mb-4">
+                <div>
+                    <h3 class="font-semibold text-gray-900" x-text="t('searchKeywords')"></h3>
+                    <p class="text-xs text-gray-500 mt-1" x-text="t('searchKeywordsHint')"></p>
+                </div>
+                <div class="flex items-center gap-1.5 text-xs text-gray-500" x-show="getTotalCount(projectAnalysis.breakdowns.terms) > 8">
+                    <button @click="changeBreakdownPage('terms', -1, projectAnalysis.breakdowns.terms)" :disabled="(breakdownPages.terms || 1) <= 1" class="p-1 rounded hover:bg-gray-100 disabled:opacity-30">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                    </button>
+                    <span x-text="`${breakdownPages.terms || 1} / ${getTotalPages(projectAnalysis.breakdowns.terms, 8)}`"></span>
+                    <button @click="changeBreakdownPage('terms', 1, projectAnalysis.breakdowns.terms)" :disabled="(breakdownPages.terms || 1) >= getTotalPages(projectAnalysis.breakdowns.terms, 8)" class="p-1 rounded hover:bg-gray-100 disabled:opacity-30">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="space-y-3" x-show="getPaginatedEntries(projectAnalysis.breakdowns.terms, breakdownPages.terms || 1, 8).length > 0">
+                <template x-for="entry in getPaginatedEntries(projectAnalysis.breakdowns.terms, breakdownPages.terms || 1, 8)" :key="entry[0]">
+                    <div class="flex items-center justify-between gap-4">
+                        <span class="text-gray-700 truncate flex-1 text-sm" :title="entry[0]" x-text="entry[0]"></span>
+                        <div class="flex items-center space-x-2 shrink-0">
+                            <div class="w-32 bg-gray-200 rounded-full h-2">
+                                <div class="bg-amber-500 h-2 rounded-full" :style="getBarStyle(entry[1], projectAnalysis.breakdowns.terms)"></div>
+                            </div>
+                            <span class="text-sm text-gray-500 min-w-8 text-right font-medium" x-text="entry[1]"></span>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            <p x-show="getTotalCount(projectAnalysis.breakdowns.terms) === 0" class="text-gray-500 text-center py-4 text-sm" x-text="t('noData')"></p>
+        </div>
+
+        <!-- siteSearch -->
+        <div class="bg-white rounded-xl shadow-sm p-6 stat-card">
+            <div class="flex items-start justify-between gap-2 mb-4">
+                <div>
+                    <h3 class="font-semibold text-gray-900" x-text="t('siteSearch')"></h3>
+                    <p class="text-xs text-gray-500 mt-1" x-text="t('siteSearchHint')"></p>
+                </div>
+                <div class="flex items-center gap-1.5 text-xs text-gray-500" x-show="getTotalCount(projectAnalysis.breakdowns.siteSearches) > 8">
+                    <button @click="changeBreakdownPage('siteSearches', -1, projectAnalysis.breakdowns.siteSearches)" :disabled="(breakdownPages.siteSearches || 1) <= 1" class="p-1 rounded hover:bg-gray-100 disabled:opacity-30">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                    </button>
+                    <span x-text="`${breakdownPages.siteSearches || 1} / ${getTotalPages(projectAnalysis.breakdowns.siteSearches, 8)}`"></span>
+                    <button @click="changeBreakdownPage('siteSearches', 1, projectAnalysis.breakdowns.siteSearches)" :disabled="(breakdownPages.siteSearches || 1) >= getTotalPages(projectAnalysis.breakdowns.siteSearches, 8)" class="p-1 rounded hover:bg-gray-100 disabled:opacity-30">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="space-y-3" x-show="getPaginatedEntries(projectAnalysis.breakdowns.siteSearches, breakdownPages.siteSearches || 1, 8).length > 0">
+                <template x-for="entry in getPaginatedEntries(projectAnalysis.breakdowns.siteSearches, breakdownPages.siteSearches || 1, 8)" :key="entry[0]">
+                    <div class="flex items-center justify-between gap-4">
+                        <span class="text-gray-700 truncate flex-1 text-sm" :title="entry[0]" x-text="entry[0]"></span>
+                        <div class="flex items-center space-x-2 shrink-0">
+                            <div class="w-32 bg-gray-200 rounded-full h-2">
+                                <div class="bg-teal-500 h-2 rounded-full" :style="getBarStyle(entry[1], projectAnalysis.breakdowns.siteSearches)"></div>
+                            </div>
+                            <span class="text-sm text-gray-500 min-w-8 text-right font-medium" x-text="entry[1]"></span>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            <p x-show="getTotalCount(projectAnalysis.breakdowns.siteSearches) === 0" class="text-gray-500 text-center py-4 text-sm" x-text="t('noData')"></p>
         </div>
 
         <!-- Top Countries -->

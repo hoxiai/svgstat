@@ -46,7 +46,7 @@ export function createEmptyInstallation() {
 }
 
 export function createEmptyRealtime() {
-    return { projectId: '', pv5: 0, pv30: 0, visitors5: 0, visitors30: 0, lastSeenAt: null };
+    return { projectId: '', pv5: 0, pv30: 0, visitors5: 0, visitors30: 0, lastSeenAt: null, sources: {}, pages: {} };
 }
 
 export function createEmptyAnalysis(days = 30) {
@@ -55,7 +55,7 @@ export function createEmptyAnalysis(days = 30) {
         current: { pv: 0, uv: 0, requests: 0, bots: 0 },
         previous: { pv: 0, uv: 0, requests: 0, bots: 0 },
         changes: { pv: null, uv: null, requests: null, bots: null },
-        breakdowns: { paths: {}, referrers: {}, countries: {}, devices: {}, browsers: {}, sources: {}, mediums: {}, campaigns: {} }
+        breakdowns: { paths: {}, referrers: {}, countries: {}, devices: {}, browsers: {}, sources: {}, mediums: {}, campaigns: {}, terms: {}, channels: {}, siteSearches: {} }
     };
 }
 
@@ -102,6 +102,9 @@ export function createDefaultBreakdownPages() {
         sources: 1,
         mediums: 1,
         campaigns: 1,
+        channelSources: 1,
+        terms: 1,
+        siteSearches: 1,
         ips: 1,
         entrances: 1,
         exits: 1,
@@ -156,6 +159,7 @@ export function createInitialState() {
         diagnosticsPollTimer: null,
         selectedEventName: '',
         projectTab: 'overview',
+        sourceChannel: '',
         breakdownPages: createDefaultBreakdownPages(),
         diagnosticsPage: 1,
         diagnosticsPageSize: 10,

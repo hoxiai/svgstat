@@ -215,6 +215,30 @@ export function createFormatterMethods() {
             }
         },
 
+        // Channels are keyed "medium\u001fsource"; with no channel selected
+        // every source is shown.
+        getChannelSources() {
+            const breakdowns = this.projectAnalysis.breakdowns || {};
+            if (!this.sourceChannel) return breakdowns.sources || {};
+            const prefix = this.sourceChannel + '\u001f';
+            const result = {};
+            Object.entries(breakdowns.channels || {}).forEach(([key, count]) => {
+                if (key.startsWith(prefix)) result[key.slice(prefix.length)] = count;
+            });
+            return result;
+        },
+
+        selectSourceChannel(channel) {
+            this.sourceChannel = channel;
+            this.breakdownPages.channelSources = 1;
+        },
+
+        mediumLabel(medium) {
+            const key = `medium_${medium}`;
+            const label = this.t(key);
+            return label === key ? medium : label;
+        },
+
         getBarStyle(count, record) {
             const values = Object.values(record || {});
             const max = values.length ? Math.max(...values) : 0;

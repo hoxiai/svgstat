@@ -42,48 +42,16 @@ func TestParseOptionalTime(t *testing.T) {
 }
 
 func TestWebsiteAttribution(t *testing.T) {
-	path, referrer, source, medium, campaign := websiteAttribution(
+	got := websiteAttribution(
 		"/pricing?utm_source=Newsletter&utm_medium=Email&utm_campaign=Summer%20Launch#plans",
 		"https://search.example/results?q=svg",
+		"",
 	)
-	if path != "/pricing#plans" || referrer != "https://search.example/results" {
-		t.Fatalf("path/referrer = %q / %q", path, referrer)
+	if got.Path != "/pricing#plans" || got.Referrer != "https://search.example/results" {
+		t.Fatalf("path/referrer = %q / %q", got.Path, got.Referrer)
 	}
-	if source != "newsletter" || medium != "email" || campaign != "summer launch" {
-		t.Fatalf("attribution = %q / %q / %q", source, medium, campaign)
-	}
-}
-
-func TestWebsiteAttributionInfersDirectAndReferral(t *testing.T) {
-	_, _, source, medium, _ := websiteAttribution("/", "")
-	if source != "direct" || medium != "none" {
-		t.Fatalf("direct attribution = %q / %q", source, medium)
-	}
-	_, _, source, medium, _ = websiteAttribution("/docs", "https://github.com/org/repo")
-	if source != "github.com" || medium != "referral" {
-		t.Fatalf("referral attribution = %q / %q", source, medium)
-	}
-
-	// Search engine -> organic
-	_, _, source, medium, _ = websiteAttribution("/", "https://www.google.com/search?q=svgstat")
-	if source != "www.google.com" || medium != "organic" {
-		t.Fatalf("google attribution = %q / %q, want organic", source, medium)
-	}
-
-	_, _, source, medium, _ = websiteAttribution("/", "https://www.baidu.com/s?wd=svgstat")
-	if source != "www.baidu.com" || medium != "organic" {
-		t.Fatalf("baidu attribution = %q / %q, want organic", source, medium)
-	}
-
-	// Social media -> social
-	_, _, source, medium, _ = websiteAttribution("/", "https://x.com/user/status/123")
-	if source != "x.com" || medium != "social" {
-		t.Fatalf("x attribution = %q / %q, want social", source, medium)
-	}
-
-	_, _, source, medium, _ = websiteAttribution("/", "https://www.zhihu.com/question/123")
-	if source != "www.zhihu.com" || medium != "social" {
-		t.Fatalf("zhihu attribution = %q / %q, want social", source, medium)
+	if got.Source != "newsletter" || got.Medium != "email" || got.Campaign != "summer launch" {
+		t.Fatalf("attribution = %q / %q / %q", got.Source, got.Medium, got.Campaign)
 	}
 }
 

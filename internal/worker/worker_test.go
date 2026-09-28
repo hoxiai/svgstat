@@ -65,6 +65,7 @@ func TestDailyStatsArgs(t *testing.T) {
 		Sources:   map[string]int64{"newsletter": 4},
 		Mediums:   map[string]int64{"email": 4},
 		Campaigns: map[string]int64{"launch": 4},
+		Terms:     map[string]int64{"svg badge": 2},
 	}
 
 	args, err := dailyStatsArgs(stats)
@@ -72,8 +73,11 @@ func TestDailyStatsArgs(t *testing.T) {
 		t.Fatalf("dailyStatsArgs() error = %v", err)
 	}
 
-	if len(args) != 36 {
-		t.Fatalf("dailyStatsArgs() returned %d args, want 36", len(args))
+	if len(args) != 39 {
+		t.Fatalf("dailyStatsArgs() returned %d args, want 39", len(args))
+	}
+	if terms, ok := args[36].([]byte); !ok || string(terms) != `{"svg badge":2}` {
+		t.Errorf("args[36] (terms) = %v, want {\"svg badge\":2}", args[36])
 	}
 
 	id, ok := args[0].(string)
@@ -129,7 +133,7 @@ func TestDailyStatsArgsEmptyMaps(t *testing.T) {
 	}
 
 	// JSONB columns must receive {} rather than null so queries can rely on it.
-	jsonIndexes := []int{7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 32, 33, 34, 35}
+	jsonIndexes := []int{7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 32, 33, 34, 35, 36, 37, 38}
 	for _, i := range jsonIndexes {
 		raw, ok := args[i].([]byte)
 		if !ok {

@@ -63,6 +63,7 @@ export function createRouterMethods() {
                 this.lastLoadedVisitorsRequestKey = '';
                 this.visitorFilters = createDefaultVisitorFilters();
                 this.breakdownPages = createDefaultBreakdownPages();
+                this.sourceChannel = '';
                 this.diagnosticsPage = 1;
                 this.eventsPage = 1;
                 this.sessionSegmentsPage = 1;

@@ -6,6 +6,13 @@
     var project = (script.getAttribute('data-project') || '').trim().toLowerCase();
 	var mode = (script.getAttribute('data-mode') || 'live').trim().toLowerCase();
 	var autoTrack = script.getAttribute('data-auto-track') !== 'false';
+	var searchParams = (script.getAttribute('data-search-params') || 'q,s,search,query,keyword,keywords,wd,kw,search_query')
+		.split(',').map(function (name) { return name.trim(); }).filter(Boolean);
+	// Landing-URL parameters that attribute the whole visit (UTM tags and ad
+	// click IDs); they are copied onto later pageviews of the same visit.
+	var attributionParams = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
+		'gclid', 'gbraid', 'wbraid', 'dclid', 'msclkid', 'bd_vid', 'gdt_vid', 'qz_gdt',
+		'ttclid', 'twclid', 'li_fat_id', 'yclid', 'epik', 'fbclid'];
     if (!project || script.getAttribute('data-track') === 'false') return;
 	window.__svgstatProjects = window.__svgstatProjects || {};
 	if (window.__svgstatProjects[project]) return;
@@ -57,7 +64,7 @@
 			try {
 				var landing = new URL(attribution, location.origin);
 				var current = new URL(nextPath, location.origin);
-				['utm_source', 'utm_medium', 'utm_campaign'].forEach(function (key) {
+				attributionParams.forEach(function (key) {
 					var value = landing.searchParams.get(key);
 					if (value && !current.searchParams.has(key)) current.searchParams.set(key, value);
 				});
@@ -88,12 +95,25 @@
 		return body;
 	}
 
+	function siteSearchTerm(path) {
+		try {
+			var params = new URL(path, location.origin).searchParams;
+			for (var i = 0; i < searchParams.length; i++) {
+				var value = (params.get(searchParams[i]) || '').trim();
+				if (value) return value.slice(0, 100);
+			}
+		} catch (_) {}
+		return '';
+	}
+
     function track(path) {
 		var nextPath = path || currentPath();
         if (!nextPath || nextPath.charAt(0) !== '/' || nextPath === lastPath) return;
         lastPath = nextPath;
 		var body = baseBody(nextPath);
 		body.set('type', 'pageview');
+		var search = siteSearchTerm(nextPath);
+		if (search) body.set('search', search);
 		send(body);
 	}
 

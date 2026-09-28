@@ -30,7 +30,7 @@ local function capped_increment(key, field, amount, limit)
 end
 
 local function increment_segments(metric, amount, use_stored)
-  for index = 11, #ARGV, 2 do
+  for index = 18, #ARGV, 2 do
     local dimension = ARGV[index]
     local value = ARGV[index + 1]
     if use_stored then value = redis.call('HGET', KEYS[1], 'segment:' .. dimension) or '' end
@@ -42,7 +42,13 @@ local function increment_segments(metric, amount, use_stored)
 end
 
 if is_new then
-  for index = 11, #ARGV, 2 do redis.call('HDEL', KEYS[1], 'segment:' .. ARGV[index]) end
+  for index = 18, #ARGV, 2 do redis.call('HDEL', KEYS[1], 'segment:' .. ARGV[index]) end
+  -- Attribution (referrer, source, medium, campaign, term, channel) counts
+  -- once per visit, on its first pageview.
+  for offset = 0, 5 do
+    local value = ARGV[12 + offset]
+    if value ~= '' then capped_increment(KEYS[10 + offset], value, 1, tonumber(ARGV[11])) end
+  end
   redis.call('HSET', KEYS[1], 'date', ARGV[2], 'last_at', current_at, 'last_path', ARGV[3], 'pages', 1)
   redis.call('INCR', KEYS[2])
   redis.call('INCR', KEYS[3])
@@ -90,7 +96,16 @@ func (a *Analytics) queueSessionUpdate(ctx context.Context, pipe redis.Pipeliner
 	if segmentFieldLimit <= 0 {
 		segmentFieldLimit = 1000000
 	}
-	args := []interface{}{now.UnixMilli(), date, path, sessionTimeout.Milliseconds(), compositeSeparator, int64(a.keyTTL.Seconds()), int64(sessionTimeout.Seconds()), sessionPageLimit, sessionFlowLimit, segmentFieldLimit}
+	dimensionLimit := a.maxDimensionValues
+	if dimensionLimit <= 0 {
+		dimensionLimit = 1000000
+	}
+	channel := ""
+	if data.Medium != "" && data.Source != "" {
+		channel = compositeField(data.Medium, data.Source)
+	}
+	args := []interface{}{now.UnixMilli(), date, path, sessionTimeout.Milliseconds(), compositeSeparator, int64(a.keyTTL.Seconds()), int64(sessionTimeout.Seconds()), sessionPageLimit, sessionFlowLimit, segmentFieldLimit,
+		dimensionLimit, data.Referrer, data.Source, data.Medium, data.Campaign, data.Term, channel}
 	for _, dimension := range []string{"source", "medium", "campaign", "device", "country"} {
 		args = append(args, dimension, safeSessionDimension(segments[dimension]))
 	}
@@ -104,6 +119,12 @@ func (a *Analytics) queueSessionUpdate(ctx context.Context, pipe redis.Pipeliner
 		cache.BuildKey("project", data.ProjectID, "exits", date),
 		cache.BuildKey("project", data.ProjectID, "page_flows", date),
 		cache.BuildKey("project", data.ProjectID, "session_segments", date),
+		cache.BuildKey("project", data.ProjectID, "referrer", date),
+		cache.BuildKey("project", data.ProjectID, "source", date),
+		cache.BuildKey("project", data.ProjectID, "medium", date),
+		cache.BuildKey("project", data.ProjectID, "campaign", date),
+		cache.BuildKey("project", data.ProjectID, "term", date),
+		cache.BuildKey("project", data.ProjectID, "channel", date),
 	}
 	pipe.Eval(ctx, updateSessionScript, keys, args...)
 }

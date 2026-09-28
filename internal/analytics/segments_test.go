@@ -35,3 +35,10 @@ func TestSegmentKeyPartIsStableAndBounded(t *testing.T) {
 		t.Fatalf("unexpected segment key: %q", first)
 	}
 }
+
+func TestTopCountsKeepsLargest(t *testing.T) {
+	got := topCounts(map[string]int64{"a": 1, "b": 5, "c": 3, "d": 3}, 2)
+	if len(got) != 2 || got["b"] != 5 || got["c"] != 3 {
+		t.Fatalf("topCounts() = %v, want b:5 c:3", got)
+	}
+}

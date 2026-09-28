@@ -521,11 +521,16 @@ func (a *App) handleCollect(w http.ResponseWriter, r *http.Request) {
 		a.jsonError(w, "Invalid collection mode", http.StatusBadRequest)
 		return
 	}
-	_, _, entry.Source, entry.Medium, entry.Campaign = analytics.WebsiteAttribution(path, referrer)
+	siteHost := ""
+	if origin, err := url.Parse(r.Header.Get("Origin")); err == nil {
+		siteHost = origin.Hostname()
+	}
+	attribution := analytics.WebsiteAttribution(path, referrer, siteHost)
+	entry.Source, entry.Medium, entry.Campaign = attribution.Source, attribution.Medium, attribution.Campaign
 	var trackErr error
 	if eventType == "pageview" {
 		if shouldWriteAnalytics(mode) {
-			trackErr = a.analytics.TrackPageview(r.Context(), r, p.ID, path, referrer, visitorID)
+			trackErr = a.analytics.TrackPageview(r.Context(), r, p.ID, path, referrer, visitorID, r.FormValue("search"))
 		}
 	} else if eventType == "event" {
 		event, err := parseCustomEvent(r.FormValue("event"), r.FormValue("properties"), path, referrer, visitorID)

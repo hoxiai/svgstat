@@ -237,8 +237,9 @@ func (w *Worker) upsertDailyStats(ctx context.Context, stats *analytics.DailySta
 			event_mediums, event_campaigns, event_values, funnel_steps,
 			audience_segments, event_segments, funnel_segments,
 			sessions, bounces, session_duration_seconds, session_pageviews,
-			entrances, exits, page_flows, session_segments
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36)
+			entrances, exits, page_flows, session_segments,
+			terms, channels, site_searches
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39)
 		ON CONFLICT (project_id, date) DO UPDATE SET
 			pv = EXCLUDED.pv,
 			uv = EXCLUDED.uv,
@@ -255,6 +256,9 @@ func (w *Worker) upsertDailyStats(ctx context.Context, stats *analytics.DailySta
 			sources = EXCLUDED.sources,
 			mediums = EXCLUDED.mediums,
 			campaigns = EXCLUDED.campaigns,
+			terms = EXCLUDED.terms,
+			channels = EXCLUDED.channels,
+			site_searches = EXCLUDED.site_searches,
 			events = EXCLUDED.events,
 			event_visitors = EXCLUDED.event_visitors,
 			event_sources = EXCLUDED.event_sources,
@@ -427,6 +431,18 @@ func dailyStatsArgs(stats *analytics.DailyStats) ([]interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal session segments: %w", err)
 	}
+	terms, err := json.Marshal(nonNilCounts(stats.Terms))
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal terms: %w", err)
+	}
+	channels, err := json.Marshal(nonNilCounts(stats.Channels))
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal channels: %w", err)
+	}
+	siteSearches, err := json.Marshal(nonNilCounts(stats.SiteSearches))
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal site searches: %w", err)
+	}
 
 	return []interface{}{
 		newID(), stats.ProjectID, stats.Date,
@@ -437,7 +453,15 @@ func dailyStatsArgs(stats *analytics.DailyStats) ([]interface{}, error) {
 		audienceSegments, eventSegments, funnelSegments,
 		stats.Sessions, stats.Bounces, stats.SessionDurationSeconds, stats.SessionPageviews,
 		entrances, exits, pageFlows, sessionSegments,
+		terms, channels, siteSearches,
 	}, nil
+}
+
+func nonNilCounts(values map[string]int64) map[string]int64 {
+	if values == nil {
+		return map[string]int64{}
+	}
+	return values
 }
 
 func newID() string {

@@ -259,7 +259,8 @@ func (s *Service) GetAnalysis(ctx context.Context, projectID string, days int, n
 		Breakdowns: emptyBreakdowns(),
 	}
 	rows, err := s.pool.Query(ctx, `
-		SELECT date, pv, uv, requests, bots, paths, referrers, countries, devices, browsers, sources, mediums, campaigns
+		SELECT date, pv, uv, requests, bots, paths, referrers, countries, devices, browsers, sources, mediums, campaigns,
+			terms, channels, site_searches
 		FROM daily_statistics
 		WHERE project_id = $1 AND date BETWEEN $2 AND $3
 	`, projectID, previousStart, end)
@@ -273,7 +274,8 @@ func (s *Service) GetAnalysis(ctx context.Context, projectID string, days int, n
 		var stats analytics.DailyStats
 		if err := rows.Scan(&date, &stats.PV, &stats.UV, &stats.Requests, &stats.Bots,
 			&stats.Paths, &stats.Referrers, &stats.Countries, &stats.Devices, &stats.Browsers,
-			&stats.Sources, &stats.Mediums, &stats.Campaigns); err != nil {
+			&stats.Sources, &stats.Mediums, &stats.Campaigns,
+			&stats.Terms, &stats.Channels, &stats.SiteSearches); err != nil {
 			return nil, fmt.Errorf("failed to scan analysis: %w", err)
 		}
 		day := utcDay(date)
@@ -740,6 +742,7 @@ func emptyBreakdowns() map[string]map[string]int64 {
 	return map[string]map[string]int64{
 		"paths": {}, "referrers": {}, "countries": {}, "devices": {}, "browsers": {},
 		"sources": {}, "mediums": {}, "campaigns": {},
+		"terms": {}, "channels": {}, "siteSearches": {},
 	}
 }
 
@@ -756,6 +759,7 @@ func addPeriodStats(target *PeriodTotals, breakdowns map[string]map[string]int64
 		"paths": stats.Paths, "referrers": stats.Referrers, "countries": stats.Countries,
 		"devices": stats.Devices, "browsers": stats.Browsers, "sources": stats.Sources,
 		"mediums": stats.Mediums, "campaigns": stats.Campaigns,
+		"terms": stats.Terms, "channels": stats.Channels, "siteSearches": stats.SiteSearches,
 	} {
 		for key, value := range values {
 			breakdowns[name][key] += value
@@ -780,8 +784,16 @@ func percentageChange(current, previous int64) *float64 {
 	return &value
 }
 
-func trimBreakdowns(breakdowns map[string]map[string]int64, limit int) {
+// breakdownLimits overrides the default trim for breakdowns the dashboard
+// filters client-side: channels are medium/source pairs split by medium.
+var breakdownLimits = map[string]int{"channels": 100}
+
+func trimBreakdowns(breakdowns map[string]map[string]int64, defaultLimit int) {
 	for name, values := range breakdowns {
+		limit := defaultLimit
+		if override, ok := breakdownLimits[name]; ok {
+			limit = override
+		}
 		type entry struct {
 			key   string
 			value int64
@@ -824,6 +836,9 @@ func maxDailyStats(stored, live *analytics.DailyStats) *analytics.DailyStats {
 	merged.Sources = maxMap(stored.Sources, live.Sources)
 	merged.Mediums = maxMap(stored.Mediums, live.Mediums)
 	merged.Campaigns = maxMap(stored.Campaigns, live.Campaigns)
+	merged.Terms = maxMap(stored.Terms, live.Terms)
+	merged.Channels = maxMap(stored.Channels, live.Channels)
+	merged.SiteSearches = maxMap(stored.SiteSearches, live.SiteSearches)
 	return &merged
 }
 

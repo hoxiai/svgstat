@@ -80,6 +80,8 @@ type RequestData struct {
 	Source     string `json:"source"`
 	Medium     string `json:"medium"`
 	Campaign   string `json:"campaign"`
+	Term       string `json:"term"`
+	SiteSearch string `json:"siteSearch"`
 }
 
 type DailyStats struct {
@@ -100,6 +102,9 @@ type DailyStats struct {
 	Sources                map[string]int64                           `json:"sources"`
 	Mediums                map[string]int64                           `json:"mediums"`
 	Campaigns              map[string]int64                           `json:"campaigns"`
+	Terms                  map[string]int64                           `json:"terms"`
+	Channels               map[string]int64                           `json:"channels"`
+	SiteSearches           map[string]int64                           `json:"siteSearches"`
 	Events                 map[string]int64                           `json:"events"`
 	EventVisitors          map[string]int64                           `json:"eventVisitors"`
 	EventSources           map[string]map[string]int64                `json:"eventSources"`
@@ -184,6 +189,10 @@ type RealtimeStats struct {
 	Visitors5  int64      `json:"visitors5"`
 	Visitors30 int64      `json:"visitors30"`
 	LastSeenAt *time.Time `json:"lastSeenAt,omitempty"`
+	// Sources and Pages count visitors active in the last 30 minutes by
+	// visit source and by the page they viewed most recently.
+	Sources map[string]int64 `json:"sources"`
+	Pages   map[string]int64 `json:"pages"`
 }
 
 func New(cache *cache.Cache, projectRepo project.Repository, geoIP *geoip.GeoIP, keyTTL time.Duration, ipSalt string) *Analytics {
@@ -224,11 +233,26 @@ func (a *Analytics) TrackRequest(ctx context.Context, req *http.Request, project
 	return a.trackRequestData(ctx, data, true, false)
 }
 
-func (a *Analytics) TrackPageview(ctx context.Context, req *http.Request, projectID, path, referrer, visitorID string) error {
+func (a *Analytics) TrackPageview(ctx context.Context, req *http.Request, projectID, path, referrer, visitorID, siteSearch string) error {
 	data := a.extractRequestData(req, projectID)
-	data.Path, data.Referrer, data.Source, data.Medium, data.Campaign = websiteAttribution(path, referrer)
+	data.applyAttribution(websiteAttribution(path, referrer, originHost(req)))
 	data.VisitorID = visitorID
+	data.SiteSearch = truncateRunes(cleanDimension(siteSearch), 100)
 	return a.trackRequestData(ctx, data, false, true)
+}
+
+func (data *RequestData) applyAttribution(attribution Attribution) {
+	data.Path, data.Referrer = attribution.Path, attribution.Referrer
+	data.Source, data.Medium, data.Campaign, data.Term = attribution.Source, attribution.Medium, attribution.Campaign, attribution.Term
+}
+
+// originHost is the host of the page that sent a collect request.
+func originHost(req *http.Request) string {
+	parsed, err := url.Parse(req.Header.Get("Origin"))
+	if err != nil {
+		return ""
+	}
+	return parsed.Hostname()
 }
 
 func (a *Analytics) TrackEvent(ctx context.Context, req *http.Request, projectID string, event EventData) error {
@@ -236,7 +260,7 @@ func (a *Analytics) TrackEvent(ctx context.Context, req *http.Request, projectID
 	if data.IsBot {
 		return nil
 	}
-	data.Path, data.Referrer, data.Source, data.Medium, data.Campaign = websiteAttribution(event.Path, event.Referrer)
+	data.applyAttribution(websiteAttribution(event.Path, event.Referrer, originHost(req)))
 	data.VisitorID = event.VisitorID
 	event.Name = a.boundedEventName(ctx, projectID, currentDate(), event.Name)
 	visitorHash := a.hashVisitor(data.IP, data.UserAgent+"|"+data.VisitorID)
@@ -451,6 +475,9 @@ func (a *Analytics) trackRequestData(ctx context.Context, data *RequestData, cou
 	sourceKey := cache.BuildKey("project", projectID, "source", date)
 	mediumKey := cache.BuildKey("project", projectID, "medium", date)
 	campaignKey := cache.BuildKey("project", projectID, "campaign", date)
+	termKey := cache.BuildKey("project", projectID, "term", date)
+	channelKey := cache.BuildKey("project", projectID, "channel", date)
+	siteSearchKey := cache.BuildKey("project", projectID, "site_search", date)
 	visitorsKey := cache.BuildKey("project", projectID, "visitors_v2", date)
 	installationFirstKey := cache.BuildKey("project", projectID, "installation", "first_seen")
 	installationLastKey := cache.BuildKey("project", projectID, "installation", "last_seen")
@@ -471,12 +498,15 @@ func (a *Analytics) trackRequestData(ctx context.Context, data *RequestData, cou
 		realtimeVisitorsKey := cache.BuildKey("project", projectID, "realtime", "visitors", minute)
 		realtimeLastSeenKey := cache.BuildKey("project", projectID, "realtime", "last_seen")
 		visitorKey := cache.BuildKey("project", projectID, "visitor_v2", date, visitorHash)
+		realtimeVisitsKey := cache.BuildKey("project", projectID, "realtime", "visits", minute)
 		pipe.Incr(ctx, realtimePVKey)
 		if exactVisitor {
 			pipe.SAdd(ctx, realtimeVisitorsKey, visitorHash)
+			pipe.HSet(ctx, realtimeVisitsKey, visitorHash, compositeField(data.Source, data.Path))
 		}
 		pipe.Expire(ctx, realtimePVKey, 2*time.Hour)
 		pipe.Expire(ctx, realtimeVisitorsKey, 2*time.Hour)
+		pipe.Expire(ctx, realtimeVisitsKey, 2*time.Hour)
 		pipe.Set(ctx, realtimeLastSeenKey, now, 2*time.Hour)
 		if exactVisitor {
 			pipe.SAdd(ctx, uvSetKey, visitorHash)
@@ -499,9 +529,6 @@ func (a *Analytics) trackRequestData(ctx context.Context, data *RequestData, cou
 			a.queueSessionUpdate(ctx, pipe, data, visitorHash, date, eventTime)
 		}
 
-		if data.Referrer != "" {
-			a.queueCappedHashIncrement(ctx, pipe, referrerKey, data.Referrer, 1)
-		}
 		if data.Country != "" {
 			a.queueCappedHashIncrement(ctx, pipe, countryKey, data.Country, 1)
 		}
@@ -523,14 +550,10 @@ func (a *Analytics) trackRequestData(ctx context.Context, data *RequestData, cou
 		if data.IP != "" {
 			a.queueCappedHashIncrement(ctx, pipe, ipKey, data.IP, 1)
 		}
-		if data.Source != "" {
-			a.queueCappedHashIncrement(ctx, pipe, sourceKey, data.Source, 1)
-		}
-		if data.Medium != "" {
-			a.queueCappedHashIncrement(ctx, pipe, mediumKey, data.Medium, 1)
-		}
-		if data.Campaign != "" {
-			a.queueCappedHashIncrement(ctx, pipe, campaignKey, data.Campaign, 1)
+		// Referrer, source, medium, campaign, term and channel count per
+		// visit inside queueSessionUpdate; site searches count every search.
+		if data.SiteSearch != "" {
+			a.queueCappedHashIncrement(ctx, pipe, siteSearchKey, data.SiteSearch, 1)
 		}
 		audienceRegistryKey := cache.BuildKey("project", projectID, "audience_segment_values", date)
 		if exactVisitor {
@@ -549,7 +572,7 @@ func (a *Analytics) trackRequestData(ctx context.Context, data *RequestData, cou
 	for _, key := range []string{
 		pvKey, requestsKey, botsKey, uvSetKey, referrerKey, countryKey,
 		regionKey, cityKey, deviceKey, browserKey, pathKey, ipKey, sourceKey,
-		mediumKey, campaignKey, visitorsKey,
+		mediumKey, campaignKey, termKey, channelKey, siteSearchKey, visitorsKey,
 	} {
 		pipe.Expire(ctx, key, a.keyTTL)
 	}
@@ -640,77 +663,6 @@ func parseOptionalTime(value interface{}) *time.Time {
 	return &parsed
 }
 
-func websiteAttribution(rawPath, rawReferrer string) (path, referrer, source, medium, campaign string) {
-	path = "/"
-	parsedPath, err := url.Parse(rawPath)
-	if err == nil {
-		if parsedPath.EscapedPath() != "" {
-			path = parsedPath.EscapedPath()
-		}
-		if fragment := cleanPathFragment(parsedPath.Fragment); fragment != "" {
-			path += "#" + fragment
-		}
-		query := parsedPath.Query()
-		source = cleanDimension(query.Get("utm_source"))
-		medium = cleanDimension(query.Get("utm_medium"))
-		campaign = cleanDimension(query.Get("utm_campaign"))
-	}
-	referrer = cleanReferrer(rawReferrer)
-	domain := referrerDomain(referrer)
-	refSource, refMedium := classifyReferrer(domain)
-
-	if source == "" {
-		source = refSource
-	}
-	if medium == "" {
-		if source == refSource {
-			medium = refMedium
-		} else if source == "direct" {
-			medium = "none"
-		} else {
-			medium = "referral"
-		}
-	}
-	return path, referrer, source, medium, campaign
-}
-
-func classifyReferrer(domain string) (source, medium string) {
-	if domain == "" {
-		return "direct", "none"
-	}
-
-	source = domain
-	d := strings.TrimPrefix(strings.ToLower(domain), "www.")
-
-	// Search engines -> organic
-	if strings.Contains(d, "google.") ||
-		strings.Contains(d, "bing.com") ||
-		strings.Contains(d, "baidu.com") ||
-		strings.Contains(d, "sogou.com") ||
-		strings.Contains(d, "so.com") ||
-		strings.Contains(d, "duckduckgo.com") ||
-		strings.Contains(d, "yahoo.com") ||
-		strings.Contains(d, "yandex.") ||
-		strings.Contains(d, "ecosia.org") {
-		return source, "organic"
-	}
-
-	// Social networks & communities -> social
-	if d == "twitter.com" || d == "x.com" || d == "t.co" ||
-		d == "facebook.com" || d == "instagram.com" ||
-		d == "reddit.com" || d == "linkedin.com" ||
-		d == "weibo.com" || d == "zhihu.com" ||
-		d == "v2ex.com" || strings.Contains(d, "weixin.qq.com") {
-		return source, "social"
-	}
-
-	return source, "referral"
-}
-
-func WebsiteAttribution(rawPath, rawReferrer string) (path, referrer, source, medium, campaign string) {
-	return websiteAttribution(rawPath, rawReferrer)
-}
-
 func cleanDimension(value string) string {
 	value = strings.TrimSpace(strings.ToLower(value))
 	return truncateRunes(value, 128)
@@ -740,26 +692,24 @@ func cleanReferrer(value string) string {
 	return truncateRunes(value, 2048)
 }
 
-func referrerDomain(value string) string {
-	parsed, err := url.Parse(value)
-	if err != nil || parsed.Hostname() == "" {
-		return ""
-	}
-	return strings.ToLower(parsed.Hostname())
-}
-
 func (a *Analytics) GetRealtimeStats(ctx context.Context, projectID string, now time.Time) (*RealtimeStats, error) {
 	minuteKeys := make([]string, 0, 30)
 	visitorKeys := make([]string, 0, 30)
+	visitKeys := make([]string, 0, 30)
 	for offset := 0; offset < 30; offset++ {
 		minute := now.UTC().Add(-time.Duration(offset) * time.Minute).Format("200601021504")
 		minuteKeys = append(minuteKeys, cache.BuildKey("project", projectID, "realtime", "pv", minute))
 		visitorKeys = append(visitorKeys, cache.BuildKey("project", projectID, "realtime", "visitors", minute))
+		visitKeys = append(visitKeys, cache.BuildKey("project", projectID, "realtime", "visits", minute))
 	}
 	pipe := a.cache.Pipeline()
 	pvCommands := make([]*redis.StringCmd, len(minuteKeys))
 	for index, key := range minuteKeys {
 		pvCommands[index] = pipe.Get(ctx, key)
+	}
+	visitCommands := make([]*redis.MapStringStringCmd, len(visitKeys))
+	for index, key := range visitKeys {
+		visitCommands[index] = pipe.HGetAll(ctx, key)
 	}
 	visitors5Cmd := pipe.SUnion(ctx, visitorKeys[:5]...)
 	visitors30Cmd := pipe.SUnion(ctx, visitorKeys...)
@@ -768,7 +718,27 @@ func (a *Analytics) GetRealtimeStats(ctx context.Context, projectID string, now 
 	if err != nil && err != redis.Nil {
 		return nil, fmt.Errorf("failed to get realtime statistics: %w", err)
 	}
-	result := &RealtimeStats{ProjectID: projectID}
+	result := &RealtimeStats{ProjectID: projectID, Sources: map[string]int64{}, Pages: map[string]int64{}}
+	// Minutes run newest first, so the first entry per visitor is its latest.
+	seen := map[string]bool{}
+	for _, command := range visitCommands {
+		for visitor, value := range command.Val() {
+			if seen[visitor] {
+				continue
+			}
+			seen[visitor] = true
+			if parts := splitCompositeField(value, 2); len(parts) == 2 {
+				if parts[0] != "" {
+					result.Sources[parts[0]]++
+				}
+				if parts[1] != "" {
+					result.Pages[parts[1]]++
+				}
+			}
+		}
+	}
+	result.Sources = topCounts(result.Sources, realtimeTopLimit)
+	result.Pages = topCounts(result.Pages, realtimeTopLimit)
 	for index, command := range pvCommands {
 		value, _ := command.Int64()
 		result.PV30 += value
@@ -782,6 +752,30 @@ func (a *Analytics) GetRealtimeStats(ctx context.Context, projectID string, now 
 		result.LastSeenAt = parsed
 	}
 	return result, nil
+}
+
+const realtimeTopLimit = 10
+
+// topCounts keeps the limit largest counts, breaking ties by key.
+func topCounts(values map[string]int64, limit int) map[string]int64 {
+	if len(values) <= limit {
+		return values
+	}
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if values[keys[i]] == values[keys[j]] {
+			return keys[i] < keys[j]
+		}
+		return values[keys[i]] > values[keys[j]]
+	})
+	result := make(map[string]int64, limit)
+	for _, key := range keys[:limit] {
+		result[key] = values[key]
+	}
+	return result
 }
 
 func (a *Analytics) GetTodayStats(ctx context.Context, projectID string) (*DailyStats, error) {
@@ -806,6 +800,9 @@ func (a *Analytics) GetStats(ctx context.Context, projectID, date string) (*Dail
 	sourceKey := cache.BuildKey("project", projectID, "source", date)
 	mediumKey := cache.BuildKey("project", projectID, "medium", date)
 	campaignKey := cache.BuildKey("project", projectID, "campaign", date)
+	termKey := cache.BuildKey("project", projectID, "term", date)
+	channelKey := cache.BuildKey("project", projectID, "channel", date)
+	siteSearchKey := cache.BuildKey("project", projectID, "site_search", date)
 	eventsKey := cache.BuildKey("project", projectID, "events", date)
 	eventSourcesKey := cache.BuildKey("project", projectID, "event_sources", date)
 	eventMediumsKey := cache.BuildKey("project", projectID, "event_mediums", date)
@@ -835,6 +832,9 @@ func (a *Analytics) GetStats(ctx context.Context, projectID, date string) (*Dail
 	sourcesCmd := pipe.HGetAll(ctx, sourceKey)
 	mediumsCmd := pipe.HGetAll(ctx, mediumKey)
 	campaignsCmd := pipe.HGetAll(ctx, campaignKey)
+	termsCmd := pipe.HGetAll(ctx, termKey)
+	channelsCmd := pipe.HGetAll(ctx, channelKey)
+	siteSearchesCmd := pipe.HGetAll(ctx, siteSearchKey)
 	eventsCmd := pipe.HGetAll(ctx, eventsKey)
 	eventSourcesCmd := pipe.HGetAll(ctx, eventSourcesKey)
 	eventMediumsCmd := pipe.HGetAll(ctx, eventMediumsKey)
@@ -855,20 +855,23 @@ func (a *Analytics) GetStats(ctx context.Context, projectID, date string) (*Dail
 	}
 
 	stats := &DailyStats{
-		ProjectID: projectID,
-		Date:      date,
-		Referrers: make(map[string]int64),
-		Countries: make(map[string]int64),
-		Regions:   make(map[string]int64),
-		Cities:    make(map[string]int64),
-		Devices:   make(map[string]int64),
-		Browsers:  make(map[string]int64),
-		Paths:     make(map[string]int64),
-		IPs:       make(map[string]int64),
-		Sources:   make(map[string]int64),
-		Mediums:   make(map[string]int64),
-		Campaigns: make(map[string]int64),
-		Events:    make(map[string]int64), EventVisitors: make(map[string]int64),
+		ProjectID:    projectID,
+		Date:         date,
+		Referrers:    make(map[string]int64),
+		Countries:    make(map[string]int64),
+		Regions:      make(map[string]int64),
+		Cities:       make(map[string]int64),
+		Devices:      make(map[string]int64),
+		Browsers:     make(map[string]int64),
+		Paths:        make(map[string]int64),
+		IPs:          make(map[string]int64),
+		Sources:      make(map[string]int64),
+		Mediums:      make(map[string]int64),
+		Campaigns:    make(map[string]int64),
+		Terms:        make(map[string]int64),
+		Channels:     make(map[string]int64),
+		SiteSearches: make(map[string]int64),
+		Events:       make(map[string]int64), EventVisitors: make(map[string]int64),
 		EventSources: make(map[string]map[string]int64), EventMediums: make(map[string]map[string]int64),
 		EventCampaigns: make(map[string]map[string]int64), EventValues: make(map[string]map[string]float64),
 		FunnelSteps:      make(map[string][]int64),
@@ -923,6 +926,9 @@ func (a *Analytics) GetStats(ctx context.Context, projectID, date string) (*Dail
 	for k, v := range campaignsCmd.Val() {
 		stats.Campaigns[k], _ = parseToInt64(v)
 	}
+	parseCounts(termsCmd.Val(), stats.Terms)
+	parseCounts(channelsCmd.Val(), stats.Channels)
+	parseCounts(siteSearchesCmd.Val(), stats.SiteSearches)
 	for k, v := range eventsCmd.Val() {
 		stats.Events[k], _ = parseToInt64(v)
 	}
