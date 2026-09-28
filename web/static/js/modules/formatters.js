@@ -507,13 +507,14 @@ export function createFormatterMethods() {
                 const h = hostname.toLowerCase();
                 if (h.includes('tieba.baidu.com')) return false;
                 if (h.startsWith('mail.google.') || h.startsWith('gemini.google.') || h.startsWith('mail.yahoo.')) return false;
-                const searchPatterns = [
-                    'baidu.', 'google.', 'bing.', 'so.com', '360.cn', '360.com',
-                    'sogou.', 'sm.cn', 'toutiao.', 'yahoo.', 'duckduckgo.',
-                    'yandex.', 'ya.ru', 'ecosia.', 'brave.', 'naver.',
-                    'seznam.', 'qwant.', 'startpage.'
+                const exactDomains = ['so.com', '360.cn', '360.com', 'sm.cn', 'ya.ru'];
+                if (exactDomains.some(d => h === d || h.endsWith('.' + d))) return true;
+                const searchBrands = [
+                    'baidu', 'google', 'bing', 'sogou', 'toutiao', 'yahoo',
+                    'duckduckgo', 'yandex', 'ecosia', 'brave', 'naver',
+                    'seznam', 'qwant', 'startpage'
                 ];
-                return searchPatterns.some(pattern => h.includes(pattern));
+                return searchBrands.some(brand => h === brand || h.startsWith(brand + '.') || h.includes('.' + brand + '.'));
             };
 
             Object.entries(referrers).forEach(([url, count]) => {
