@@ -64,16 +64,17 @@ func maskIP(raw string) string {
 				return parts[0] + "." + parts[1] + ".*.*"
 			}
 		}
-		parts := strings.Split(raw, ":")
-		if len(parts) >= 2 && parts[0] != "" && parts[1] != "" {
-			return parts[0] + ":" + parts[1] + ":*::*"
+		if len(ip) == 16 {
+			h1 := (uint16(ip[0]) << 8) | uint16(ip[1])
+			h2 := (uint16(ip[2]) << 8) | uint16(ip[3])
+			return fmt.Sprintf("%x:%x:*::*", h1, h2)
 		}
 		return "prefix:*"
 	}
 	if strings.HasPrefix(raw, "anon_") {
 		return "anon_*"
 	}
-	return raw
+	return "unknown"
 }
 
 // classifySourceCategory maps traffic source/medium into search, referral, direct, ai, social, email.
