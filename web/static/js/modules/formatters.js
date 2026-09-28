@@ -323,20 +323,27 @@ export function createFormatterMethods() {
                 yesterdayVals.push(yesterdayHourly[k]?.[metric] || 0);
             }
 
-            const max = Math.max(1, ...todayVals, ...yesterdayVals);
+            const displayMax = Math.max(0, ...todayVals, ...yesterdayVals);
+            const scaleMax = Math.max(1, displayMax);
 
             const width = 1000;
             const height = 205;
             const chartHeight = 175;
 
-            const getY = (val) => (height - (val / max) * chartHeight);
-            const getX = (h) => (h / 23) * width;
+            const getY = (val) => (height - (val / scaleMax) * chartHeight);
+            const getX = (h) => (h / 24) * width;
 
             const todayPoints = [];
             for (let h = 0; h <= currentHour && h < 24; h++) {
                 const k = String(h).padStart(2, '0');
                 const val = todayHourly[k]?.[metric] || 0;
                 todayPoints.push(`${getX(h).toFixed(1)},${getY(val).toFixed(1)}`);
+            }
+
+            if (todayPoints.length === 1) {
+                const [x, y] = todayPoints[0].split(',');
+                const x2 = (parseFloat(x) + 0.1).toFixed(1);
+                todayPoints.push(`${x2},${y}`);
             }
 
             const yesterdayPoints = [];
@@ -349,7 +356,8 @@ export function createFormatterMethods() {
             return {
                 today: todayPoints.join(' '),
                 yesterday: yesterdayPoints.join(' '),
-                max,
+                max: displayMax,
+                scaleMax,
                 currentHour
             };
         },
@@ -494,6 +502,20 @@ export function createFormatterMethods() {
             const referrers = breakdowns.referrers || {};
             const items = [];
 
+            const isSearchEngineDomain = (hostname) => {
+                if (!hostname) return false;
+                const h = hostname.toLowerCase();
+                if (h.includes('tieba.baidu.com')) return false;
+                if (h.startsWith('mail.google.') || h.startsWith('gemini.google.') || h.startsWith('mail.yahoo.')) return false;
+                const searchPatterns = [
+                    'baidu.', 'google.', 'bing.', 'so.com', '360.cn', '360.com',
+                    'sogou.', 'sm.cn', 'toutiao.', 'yahoo.', 'duckduckgo.',
+                    'yandex.', 'ya.ru', 'ecosia.', 'brave.', 'naver.',
+                    'seznam.', 'qwant.', 'startpage.'
+                ];
+                return searchPatterns.some(pattern => h.includes(pattern));
+            };
+
             Object.entries(referrers).forEach(([url, count]) => {
                 if (!url || url === 'Direct' || url === 'direct' || url === 'none') return;
                 let domain = url;
@@ -501,6 +523,8 @@ export function createFormatterMethods() {
                     const parsed = new URL(url.includes('://') ? url : `https://${url}`);
                     domain = parsed.hostname;
                 } catch (_) {}
+
+                if (isSearchEngineDomain(domain)) return;
 
                 items.push({
                     url,

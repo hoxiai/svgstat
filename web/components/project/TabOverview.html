@@ -180,9 +180,9 @@
                 <line x1="0" y1="88" x2="1000" y2="88" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="4 4"></line>
                 <line x1="0" y1="30" x2="1000" y2="30" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="4 4"></line>
 
-                <!-- Vertical Hour Marker Lines (every 4 hours: 0, 4, 8, 12, 16, 20) -->
-                <template x-for="h in [0, 4, 8, 12, 16, 20]" :key="h">
-                    <line :x1="(h / 23) * 1000" y1="30" :x2="(h / 23) * 1000" y2="205" stroke="#f3f4f6" stroke-width="1" stroke-dasharray="3 3"></line>
+                <!-- Vertical Hour Marker Lines (every 3 hours: 0, 3, 6, 9, 12, 15, 18, 21, 24) -->
+                <template x-for="h in [0, 3, 6, 9, 12, 15, 18, 21, 24]" :key="h">
+                    <line :x1="(h / 24) * 1000" y1="30" :x2="(h / 24) * 1000" y2="205" stroke="#f3f4f6" stroke-width="1" stroke-dasharray="3 3"></line>
                 </template>
 
                 <!-- Yesterday Full Day Line (Dashed) -->

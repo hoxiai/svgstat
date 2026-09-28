@@ -350,9 +350,6 @@ export function createAnalyticsMethods() {
                 if (this.autoRefreshStream) {
                     this.startVisitStreamPolling(projectId);
                 }
-                if (!this.visitorsPage.items || !this.visitorsPage.items.length) {
-                    this.loadVisitors(projectId, 1);
-                }
             } else if (tab === 'diagnostics') {
                 this.loadDiagnostics(projectId);
                 this.loadStats(projectId, isRefresh);
@@ -380,9 +377,7 @@ export function createAnalyticsMethods() {
                 } else if (this.projectTab === 'diagnostics') {
                     this.loadDiagnostics(projectId);
                 } else if (this.projectTab === 'visitors') {
-                    if (this.visitorsPage.page === 1 && !this.visitorFilters.path) {
-                        this.loadVisitors(projectId, 1);
-                    }
+                    this.loadVisitStream(projectId);
                 }
             }, 30000);
             if (this.projectTab === 'diagnostics') {
