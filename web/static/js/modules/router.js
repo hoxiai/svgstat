@@ -22,6 +22,9 @@ export function createRouterMethods() {
             this.stopDashboardAutoRefresh();
             this.stopDiagnosticsPolling();
             this.stopInstallationPolling();
+            if (typeof this.stopVisitStreamPolling === 'function') {
+                this.stopVisitStreamPolling();
+            }
             const path = window.location.pathname;
             if (path === '/login') {
                 this.currentPage = 'login';

@@ -276,6 +276,255 @@ export function createFormatterMethods() {
             return `${rounded > 0 ? '+' : ''}${rounded}%`;
         },
 
+        formatPercentageChange(val) {
+            if (val === null || val === undefined) return '—';
+            const num = Number(val);
+            if (Number.isNaN(num)) return '—';
+            const rounded = Math.round(num * 10) / 10;
+            return `${rounded > 0 ? '+' : ''}${rounded}%`;
+        },
+
+        formatPercentageChangeWithArrow(val) {
+            if (val === null || val === undefined) return '—';
+            const num = Number(val);
+            if (Number.isNaN(num)) return '—';
+            const rounded = Math.round(num * 10) / 10;
+            if (rounded > 0) return `↑ ${rounded}%`;
+            if (rounded < 0) return `↓ ${Math.abs(rounded)}%`;
+            return '0%';
+        },
+
+        getPercentageChangeColorClass(val) {
+            if (val === null || val === undefined) return 'border-gray-200 bg-gray-50 text-gray-500';
+            const num = Number(val);
+            if (Number.isNaN(num)) return 'border-gray-200 bg-gray-50 text-gray-500';
+            if (num > 0) return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+            if (num < 0) return 'border-rose-200 bg-rose-50 text-rose-700';
+            return 'border-gray-200 bg-gray-50 text-gray-500';
+        },
+
+        getHourlyPoints(metric, todayHourly, yesterdayHourly, currentHour) {
+            metric = metric || this.hourlyMetric || 'pv';
+            const overview = this.projectOverview;
+            todayHourly = todayHourly || overview?.todayHourly || {};
+            yesterdayHourly = yesterdayHourly || overview?.yesterdayHourly || {};
+            if (currentHour === undefined || currentHour === null) {
+                currentHour = overview?.currentHour ?? 23;
+            }
+
+            const todayVals = [];
+            for (let h = 0; h <= currentHour && h < 24; h++) {
+                const k = String(h).padStart(2, '0');
+                todayVals.push(todayHourly[k]?.[metric] || 0);
+            }
+            const yesterdayVals = [];
+            for (let h = 0; h < 24; h++) {
+                const k = String(h).padStart(2, '0');
+                yesterdayVals.push(yesterdayHourly[k]?.[metric] || 0);
+            }
+
+            const max = Math.max(1, ...todayVals, ...yesterdayVals);
+
+            const width = 1000;
+            const height = 205;
+            const chartHeight = 175;
+
+            const getY = (val) => (height - (val / max) * chartHeight);
+            const getX = (h) => (h / 23) * width;
+
+            const todayPoints = [];
+            for (let h = 0; h <= currentHour && h < 24; h++) {
+                const k = String(h).padStart(2, '0');
+                const val = todayHourly[k]?.[metric] || 0;
+                todayPoints.push(`${getX(h).toFixed(1)},${getY(val).toFixed(1)}`);
+            }
+
+            const yesterdayPoints = [];
+            for (let h = 0; h < 24; h++) {
+                const k = String(h).padStart(2, '0');
+                const val = yesterdayHourly[k]?.[metric] || 0;
+                yesterdayPoints.push(`${getX(h).toFixed(1)},${getY(val).toFixed(1)}`);
+            }
+
+            return {
+                today: todayPoints.join(' '),
+                yesterday: yesterdayPoints.join(' '),
+                max,
+                currentHour
+            };
+        },
+
+        getHourlyTodayPoints(metric) {
+            return this.getHourlyPoints(metric).today;
+        },
+
+        getHourlyYesterdayPoints(metric) {
+            return this.getHourlyPoints(metric).yesterday;
+        },
+
+        getHourlyMax(metric) {
+            return this.getHourlyPoints(metric).max;
+        },
+
+        setHourlyMetric(metric) {
+            this.hourlyMetric = metric;
+        },
+
+        formatSourceName(name) {
+            if (!name || name === 'none' || name === 'direct' || name === 'Direct') return this.t('directTraffic');
+            const key = `search_${name.toLowerCase()}`;
+            const translated = this.t(key);
+            if (translated !== key) return translated;
+            return name;
+        },
+
+        formatSourceCategory(cat) {
+            const key = `cat_${cat}`;
+            const translated = this.t(key);
+            return translated !== key ? translated : (cat || this.t('cat_other'));
+        },
+
+        formatSourceCategoryBadge(cat) {
+            switch (cat) {
+                case 'search': return 'bg-blue-50 text-blue-700 border-blue-200';
+                case 'referral': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                case 'direct': return 'bg-gray-100 text-gray-700 border-gray-200';
+                case 'social': return 'bg-purple-50 text-purple-700 border-purple-200';
+                case 'ai': return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+                default: return 'bg-amber-50 text-amber-700 border-amber-200';
+            }
+        },
+
+        formatLocationParts(country, region, city) {
+            const parts = [country, region, city].filter(Boolean);
+            return parts.length ? parts.join(' · ') : '—';
+        },
+
+        formatTimeOnly(value) {
+            if (!value) return '-';
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return String(value);
+            return date.toLocaleTimeString(this.lang === 'zh' ? 'zh-CN' : 'en-US', { hour12: false });
+        },
+
+        formatDateOnly(value) {
+            if (!value) return '';
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return '';
+            return date.toLocaleDateString(this.lang === 'zh' ? 'zh-CN' : 'en-US', { month: '2-digit', day: '2-digit' });
+        },
+
+        getTrafficCategories() {
+            const breakdowns = this.projectAnalysis?.breakdowns || {};
+            const channels = breakdowns.channels || {};
+            const mediums = breakdowns.mediums || {};
+
+            let search = 0;
+            let referral = 0;
+            let direct = 0;
+            let other = 0;
+
+            const searchEngines = new Set(['baidu', 'google', 'bing', '360', 'sogou', 'shenma', 'yahoo', 'duckduckgo', 'yandex', 'brave', 'naver', 'ecosia', 'toutiao']);
+
+            if (Object.keys(channels).length > 0) {
+                Object.entries(channels).forEach(([ch, count]) => {
+                    const [med, src] = ch.split('\u001f');
+                    const medium = (med || '').toLowerCase();
+                    const source = (src || '').toLowerCase();
+                    if (medium === 'organic' || medium === 'search' || searchEngines.has(source)) {
+                        search += count;
+                    } else if (medium === 'referral') {
+                        referral += count;
+                    } else if (medium === 'direct' || medium === 'none' || source === 'direct' || source === 'none' || !source) {
+                        direct += count;
+                    } else {
+                        other += count;
+                    }
+                });
+            } else {
+                Object.entries(mediums).forEach(([med, count]) => {
+                    const m = med.toLowerCase();
+                    if (m === 'organic' || m === 'search') search += count;
+                    else if (m === 'referral') referral += count;
+                    else if (m === 'direct' || m === 'none' || m === '') direct += count;
+                    else other += count;
+                });
+            }
+
+            const total = search + referral + direct + other;
+            const calcPct = (count) => (total > 0 ? Math.round((count / total) * 1000) / 10 : 0);
+
+            return {
+                total,
+                search: { count: search, pct: calcPct(search) },
+                referral: { count: referral, pct: calcPct(referral) },
+                direct: { count: direct, pct: calcPct(direct) },
+                other: { count: other, pct: calcPct(other) }
+            };
+        },
+
+        getTopSearchEngines(limit = 5) {
+            const breakdowns = this.projectAnalysis?.breakdowns || {};
+            const sources = breakdowns.sources || {};
+            const searchEngines = ['baidu', 'google', 'bing', '360', 'sogou', 'shenma', 'yahoo', 'duckduckgo', 'yandex', 'brave', 'naver'];
+
+            const items = [];
+            Object.entries(sources).forEach(([src, count]) => {
+                const lower = src.toLowerCase();
+                if (searchEngines.includes(lower)) {
+                    items.push({
+                        key: lower,
+                        name: this.formatSourceName(lower),
+                        count
+                    });
+                }
+            });
+
+            items.sort((a, b) => b.count - a.count);
+            const top = items.slice(0, limit);
+            const max = top.length ? top[0].count : 1;
+            return top.map(item => ({
+                ...item,
+                pct: max > 0 ? (item.count / max) * 100 : 0
+            }));
+        },
+
+        getTopExternalReferrers(limit = 10) {
+            const breakdowns = this.projectAnalysis?.breakdowns || {};
+            const referrers = breakdowns.referrers || {};
+            const items = [];
+
+            Object.entries(referrers).forEach(([url, count]) => {
+                if (!url || url === 'Direct' || url === 'direct' || url === 'none') return;
+                let domain = url;
+                try {
+                    const parsed = new URL(url.includes('://') ? url : `https://${url}`);
+                    domain = parsed.hostname;
+                } catch (_) {}
+
+                items.push({
+                    url,
+                    domain,
+                    count
+                });
+            });
+
+            items.sort((a, b) => b.count - a.count);
+            const top = items.slice(0, limit);
+            const max = top.length ? top[0].count : 1;
+            return top.map(item => ({
+                ...item,
+                pct: max > 0 ? (item.count / max) * 100 : 0
+            }));
+        },
+
+        getTopSearchKeywords(limit = 10) {
+            const breakdowns = this.projectAnalysis?.breakdowns || {};
+            const terms = breakdowns.terms || {};
+            const entries = Object.entries(terms).sort((a, b) => b[1] - a[1]);
+            return entries.slice(0, limit).map(([term, count]) => ({ term, count }));
+        },
+
         shortVisitorId(visitorId) {
             if (!visitorId) return '-';
             return visitorId.length > 12 ? `${visitorId.slice(0, 12)}...` : visitorId;

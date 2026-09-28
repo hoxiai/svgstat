@@ -41,6 +41,23 @@ export function createEmptyTrend(days = 30) {
     };
 }
 
+export function createEmptyProjectOverview() {
+    return {
+        projectId: '',
+        date: '',
+        pv: 0,
+        uv: 0,
+        ip: 0,
+        avgPageviewsPerUser: 0,
+        yesterdayFull: { pv: 0, uv: 0, ip: 0, requests: 0, bots: 0 },
+        yesterdaySamePeriod: { pv: 0, uv: 0, ip: 0, requests: 0, bots: 0 },
+        changes: { pv: null, uv: null, ip: null, requests: null, bots: null },
+        todayHourly: {},
+        yesterdayHourly: {},
+        currentHour: 0
+    };
+}
+
 export function createEmptyInstallation() {
     return { projectId: '', status: 'pending', firstSeenAt: null, lastSeenAt: null };
 }
@@ -140,6 +157,15 @@ export function createInitialState() {
         lastLoadedStatsProjectId: '',
         lastLoadedVisitorsRequestKey: '',
         projectStats: createEmptyProjectStats(),
+        projectOverview: null,
+        loadingOverview: false,
+        overviewRequestId: 0,
+        visitStream: [],
+        loadingVisitStream: false,
+        visitStreamRequestId: 0,
+        hourlyMetric: 'pv',
+        autoRefreshStream: true,
+        streamInterval: null,
         projectTrend: createEmptyTrend(),
         projectRealtime: createEmptyRealtime(),
         projectAnalysis: createEmptyAnalysis(),

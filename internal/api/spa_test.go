@@ -44,6 +44,11 @@ func TestHandleSPARendersEmbeddedComponents(t *testing.T) {
 		`projectTab === 'diagnostics'`,                   // from TabDiagnostics.html
 		`showCreateModal`,                                // from CreateProjectModal.html
 		`showCodeModal`,                                  // from ProjectDetailModal.html
+		`t('todayPV')`,                                   // from TabOverview.html (Hero Cards)
+		`t('hourlyComparison')`,                          // from TabOverview.html (24h Chart)
+		`t('realtimeStream')`,                            // from TabVisitors.html (Realtime Stream)
+		`getHourlyTodayPoints`,                           // from TabOverview.html
+		`getTrafficCategories`,                           // from TabOverview.html
 		`/static/vendor/unocss-runtime.js`,
 		`type="module" src="/static/js/app.js?v=`,
 	}

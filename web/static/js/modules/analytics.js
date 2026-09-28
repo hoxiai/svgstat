@@ -7,6 +7,7 @@ import {
     createEmptyIssueReport,
     createEmptyDiagnostics,
     createEmptyProjectStats,
+    createEmptyProjectOverview,
     createEmptyTrend,
     createEmptyVisitorPage,
     createDefaultVisitorFilters
@@ -51,6 +52,79 @@ export function createAnalyticsMethods() {
                 console.error('Failed to load realtime statistics', e);
             } finally {
                 if (requestId === this.realtimeRequestId) this.loadingRealtime = false;
+            }
+        },
+
+        async loadProjectOverview(projectId, force = false) {
+            if (!projectId) return;
+            const requestId = ++this.overviewRequestId;
+            this.loadingOverview = true;
+            try {
+                const res = await fetch(`/api/v1/projects/${projectId}/stats/overview`, { credentials: 'same-origin' });
+                const data = await res.json();
+                if (requestId !== this.overviewRequestId || this.selectedProject?.id !== projectId) return;
+                if (data.success) {
+                    this.projectOverview = {
+                        ...createEmptyProjectOverview(),
+                        ...data.data,
+                        yesterdayFull: { ...createEmptyProjectOverview().yesterdayFull, ...(data.data.yesterdayFull || {}) },
+                        yesterdaySamePeriod: { ...createEmptyProjectOverview().yesterdaySamePeriod, ...(data.data.yesterdaySamePeriod || {}) },
+                        changes: { ...createEmptyProjectOverview().changes, ...(data.data.changes || {}) },
+                        todayHourly: data.data.todayHourly || {},
+                        yesterdayHourly: data.data.yesterdayHourly || {}
+                    };
+                }
+            } catch (e) {
+                console.error('Failed to load project overview', e);
+            } finally {
+                if (requestId === this.overviewRequestId) this.loadingOverview = false;
+            }
+        },
+
+        async loadVisitStream(projectId) {
+            if (!projectId) return;
+            const requestId = ++this.visitStreamRequestId;
+            this.loadingVisitStream = true;
+            try {
+                const res = await fetch(`/api/v1/projects/${projectId}/visit-stream?limit=50`, { credentials: 'same-origin' });
+                const data = await res.json();
+                if (requestId !== this.visitStreamRequestId || this.selectedProject?.id !== projectId) return;
+                if (data.success) {
+                    this.visitStream = data.data || [];
+                }
+            } catch (e) {
+                console.error('Failed to load visit stream', e);
+            } finally {
+                if (requestId === this.visitStreamRequestId) this.loadingVisitStream = false;
+            }
+        },
+
+        startVisitStreamPolling(projectId) {
+            this.stopVisitStreamPolling();
+            if (!this.autoRefreshStream) return;
+            this.streamInterval = setInterval(() => {
+                if (this.currentPage === 'project-detail' && this.selectedProject?.id === projectId && this.projectTab === 'visitors' && this.autoRefreshStream) {
+                    this.loadVisitStream(projectId);
+                }
+            }, 5000);
+        },
+
+        stopVisitStreamPolling() {
+            if (this.streamInterval) {
+                clearInterval(this.streamInterval);
+                this.streamInterval = null;
+            }
+        },
+
+        toggleAutoRefreshStream() {
+            this.autoRefreshStream = !this.autoRefreshStream;
+            if (this.selectedProject) {
+                if (this.autoRefreshStream && this.projectTab === 'visitors') {
+                    this.loadVisitStream(this.selectedProject.id);
+                    this.startVisitStreamPolling(this.selectedProject.id);
+                } else {
+                    this.stopVisitStreamPolling();
+                }
             }
         },
 
@@ -246,6 +320,11 @@ export function createAnalyticsMethods() {
                 } else {
                     this.stopDiagnosticsPolling();
                 }
+                if (targetTab === 'visitors' && this.autoRefreshStream) {
+                    this.startVisitStreamPolling(this.selectedProject.id);
+                } else {
+                    this.stopVisitStreamPolling();
+                }
             }
         },
 
@@ -255,6 +334,7 @@ export function createAnalyticsMethods() {
             this.loadRealtime(projectId);
 
             if (tab === 'overview') {
+                this.loadProjectOverview(projectId, isRefresh);
                 this.loadStats(projectId, isRefresh);
                 this.loadTrend(projectId, isRefresh);
                 this.loadAnalysis(projectId, isRefresh);
@@ -266,6 +346,10 @@ export function createAnalyticsMethods() {
                 this.loadSessionQuality(projectId, isRefresh);
                 this.loadConversions(projectId);
             } else if (tab === 'visitors') {
+                this.loadVisitStream(projectId);
+                if (this.autoRefreshStream) {
+                    this.startVisitStreamPolling(projectId);
+                }
                 if (!this.visitorsPage.items || !this.visitorsPage.items.length) {
                     this.loadVisitors(projectId, 1);
                 }
@@ -282,6 +366,7 @@ export function createAnalyticsMethods() {
                 this.loadRealtime(projectId);
                 this.loadInstallation(projectId);
                 if (this.projectTab === 'overview') {
+                    this.loadProjectOverview(projectId, true);
                     this.loadStats(projectId, true);
                     this.loadTrend(projectId, true);
                     this.loadAnalysis(projectId, true);
@@ -303,11 +388,15 @@ export function createAnalyticsMethods() {
             if (this.projectTab === 'diagnostics') {
                 this.startDiagnosticsPolling(projectId);
             }
+            if (this.projectTab === 'visitors' && this.autoRefreshStream) {
+                this.startVisitStreamPolling(projectId);
+            }
         },
 
         stopDashboardAutoRefresh() {
             if (this.dashboardRefreshTimer) clearInterval(this.dashboardRefreshTimer);
             this.dashboardRefreshTimer = null;
+            this.stopVisitStreamPolling();
         },
 
         setTrendDays(days) {
