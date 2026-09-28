@@ -1373,3 +1373,40 @@ func (a *App) handleGetProjectVisitors(w http.ResponseWriter, r *http.Request) {
 
 	a.jsonSuccess(w, visitors)
 }
+
+func (a *App) handleGetProjectVisitStream(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value("user").(*auth.User)
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	p, err := a.projectRepo.GetByIDAndUser(r.Context(), id, user.ID)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to get project")
+		a.jsonError(w, "Failed to get project", http.StatusInternalServerError)
+		return
+	}
+
+	if p == nil {
+		a.jsonError(w, "Project not found", http.StatusNotFound)
+		return
+	}
+
+	limit := 50
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+	if limit > 200 {
+		limit = 200
+	}
+
+	stream, err := a.analytics.GetVisitStream(r.Context(), id, limit)
+	if err != nil {
+		log.Error().Err(err).Str("project_id", id).Msg("Failed to get visit stream")
+		a.jsonError(w, "Failed to get visit stream", http.StatusInternalServerError)
+		return
+	}
+
+	a.jsonSuccess(w, stream)
+}

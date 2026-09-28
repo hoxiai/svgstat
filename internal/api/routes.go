@@ -56,6 +56,7 @@ func (a *App) SetupRoutes() *mux.Router {
 	projects.HandleFunc("/{id}/installation", a.handleGetProjectInstallation).Methods("GET")
 	projects.HandleFunc("/{id}/website", a.handleUpdateWebsiteTracking).Methods("PUT")
 	projects.HandleFunc("/{id}/visitors", a.handleGetProjectVisitors).Methods("GET")
+	projects.HandleFunc("/{id}/visit-stream", a.handleGetProjectVisitStream).Methods("GET")
 
 	admin := api.PathPrefix("/admin").Subrouter()
 	admin.Use(a.authMiddleware)

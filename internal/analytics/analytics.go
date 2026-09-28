@@ -77,6 +77,7 @@ return added
 type RequestData struct {
 	ProjectID  string `json:"projectId"`
 	IP         string `json:"ip"`
+	RawIP      string `json:"-"`
 	UserAgent  string `json:"userAgent"`
 	Referrer   string `json:"referrer"`
 	Path       string `json:"path"`
@@ -506,6 +507,7 @@ func (a *Analytics) trackRequestData(ctx context.Context, data *RequestData, cou
 	if data.IsBot {
 		pipe.Incr(ctx, botsKey)
 	} else if shouldCountPageview(data.IsBot, countPageview) {
+		a.pushVisitStream(ctx, pipe, data, eventTime)
 		hour := eventTime.Format("15")
 		hourlyUVGuard := cache.BuildKey("project", projectID, "hourly_uvset", date, hour)
 		hourlyIPGuard := cache.BuildKey("project", projectID, "hourly_ipset", date, hour)
@@ -1190,9 +1192,11 @@ func (a *Analytics) GetVisitors(ctx context.Context, projectID, date string, que
 }
 
 func (a *Analytics) extractRequestData(req *http.Request, projectID string) *RequestData {
+	rawIP := a.clientIP(req)
 	data := &RequestData{
 		ProjectID: projectID,
-		IP:        a.clientIP(req),
+		IP:        rawIP,
+		RawIP:     rawIP,
 		UserAgent: req.UserAgent(),
 		Referrer:  req.Referer(),
 		Path:      req.URL.Path,
