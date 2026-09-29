@@ -89,7 +89,7 @@ export function createFormatterMethods() {
         },
 
         getHomepageLink() {
-            const value = String(this.codeSettings.homepageUrl || '').trim();
+            const value = String(this?.codeSettings?.homepageUrl || '').trim();
             if (!value) return '';
             try {
                 const normalized = value.includes('://') ? value : `https://${value}`;
@@ -195,6 +195,83 @@ export function createFormatterMethods() {
             if (typeof items === 'number') return items;
             if (Array.isArray(items)) return items.length;
             return Object.keys(items).length;
+        },
+
+        getFilteredPages(pathsMap, searchQuery = '') {
+            if (!pathsMap || typeof pathsMap !== 'object') return [];
+            const query = String(searchQuery || '').trim().toLowerCase();
+            const entries = Object.entries(pathsMap);
+            const totalCount = entries.reduce((sum, [, count]) => sum + (Number(count) || 0), 0);
+
+            const filtered = query
+                ? entries.filter(([path]) => String(path).toLowerCase().includes(query))
+                : entries;
+
+            filtered.sort((a, b) => {
+                const diff = (Number(b[1]) || 0) - (Number(a[1]) || 0);
+                if (diff !== 0) return diff;
+                return String(a[0]).localeCompare(String(b[0]));
+            });
+
+            return filtered.map(([path, count]) => {
+                const numericCount = Number(count) || 0;
+                const percentage = totalCount > 0 ? Math.round((numericCount / totalCount) * 1000) / 10 : 0;
+                return {
+                    path,
+                    count: numericCount,
+                    percentage
+                };
+            });
+        },
+
+        filterPages(pathsMap, searchQuery = '') {
+            return this.getFilteredPages(pathsMap, searchQuery);
+        },
+
+        getPaginatedFilteredPages(pathsMap, searchQuery = '', page = 1, pageSize = 10) {
+            const list = this.getFilteredPages(pathsMap, searchQuery);
+            const p = Math.max(1, Number(page ?? this?.pagesPage) || 1);
+            const size = Math.max(1, Number(pageSize ?? this?.pagesPageSize) || 10);
+            const start = (p - 1) * size;
+            return list.slice(start, start + size);
+        },
+
+        getTotalPagesForFiltered(pathsMap, searchQuery = '', pageSize = 10) {
+            const list = this.getFilteredPages(pathsMap, searchQuery);
+            const size = Math.max(1, Number(pageSize ?? this?.pagesPageSize) || 10);
+            return Math.max(1, Math.ceil(list.length / size));
+        },
+
+        getPageRank(index, page = null, pageSize = null) {
+            const p = Math.max(1, Number(page ?? this?.pagesPage) || 1);
+            const size = Math.max(1, Number(pageSize ?? this?.pagesPageSize) || 10);
+            return ((p - 1) * size) + Number(index || 0) + 1;
+        },
+
+        getPageRankClass(rank) {
+            if (rank === 1) return 'bg-amber-100 text-amber-800 border border-amber-300';
+            if (rank === 2) return 'bg-slate-200 text-slate-700 border border-slate-300';
+            if (rank === 3) return 'bg-orange-100 text-orange-800 border border-orange-300';
+            return 'bg-gray-100 text-gray-500 border border-gray-200';
+        },
+
+        getPagePreviewUrl(path) {
+            if (!path) return '#';
+            if (path.startsWith('http://') || path.startsWith('https://')) return path;
+            const homepage = this.getHomepageLink();
+            if (homepage) {
+                const base = homepage.replace(/\/+$/, '');
+                const cleanPath = path.startsWith('/') ? path : `/${path}`;
+                return `${base}${cleanPath}`;
+            }
+            const domains = this.selectedProject?.websiteDomains || [];
+            if (domains.length > 0 && domains[0]) {
+                const domain = domains[0].includes('://') ? domains[0] : `https://${domains[0]}`;
+                const base = domain.replace(/\/+$/, '');
+                const cleanPath = path.startsWith('/') ? path : `/${path}`;
+                return `${base}${cleanPath}`;
+            }
+            return path.startsWith('/') ? path : `/${path}`;
         },
 
         changeBreakdownPage(key, delta, record, pageSize = 8) {

@@ -466,41 +466,189 @@
         </div>
     </div>
 
-    <!-- 核心流量构成 (带分页) -->
-    <div class="grid md:grid-cols-2 gap-6">
-
-        <!-- Top Pages -->
-        <div class="bg-white rounded-xl shadow-sm p-6 stat-card">
-            <div class="flex items-center justify-between gap-2 mb-4">
-                <h3 class="font-semibold text-gray-900" x-text="t('topPages')"></h3>
-                <div class="flex items-center gap-1.5 text-xs text-gray-500" x-show="getTotalCount(projectAnalysis.breakdowns.paths) > 8">
-                    <button @click="changeBreakdownPage('paths', -1, projectAnalysis.breakdowns.paths)" :disabled="(breakdownPages.paths || 1) <= 1" class="p-1 rounded hover:bg-gray-100 disabled:opacity-30">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-                    </button>
-                    <span x-text="`${breakdownPages.paths || 1} / ${getTotalPages(projectAnalysis.breakdowns.paths, 8)}`"></span>
-                    <button @click="changeBreakdownPage('paths', 1, projectAnalysis.breakdowns.paths)" :disabled="(breakdownPages.paths || 1) >= getTotalPages(projectAnalysis.breakdowns.paths, 8)" class="p-1 rounded hover:bg-gray-100 disabled:opacity-30">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                    </button>
+    <!-- 4. 受访页面明细 (Visited Pages Breakdown - Dedicated Full-Width Card) -->
+    <div class="bg-white rounded-xl shadow-sm p-6 stat-card">
+        <!-- Card Header -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-4 border-b border-gray-100">
+            <div>
+                <div class="flex items-center gap-3">
+                    <h3 class="font-semibold text-gray-900 text-base flex items-center gap-2">
+                        <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        <span x-text="t('pagesBreakdown')"></span>
+                    </h3>
+                    <!-- Total page count badge -->
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200"
+                          x-show="getTotalCount(projectAnalysis?.breakdowns?.paths || projectStats?.paths || {}) > 0"
+                          x-text="pageSearchQuery
+                              ? (lang === 'zh'
+                                  ? `${getFilteredPages(projectAnalysis?.breakdowns?.paths || projectStats?.paths || {}, pageSearchQuery).length} / ${getTotalCount(projectAnalysis?.breakdowns?.paths || projectStats?.paths || {})} 个页面`
+                                  : `${getFilteredPages(projectAnalysis?.breakdowns?.paths || projectStats?.paths || {}, pageSearchQuery).length} of ${getTotalCount(projectAnalysis?.breakdowns?.paths || projectStats?.paths || {})} pages`)
+                              : (lang === 'zh'
+                                  ? `共 ${getTotalCount(projectAnalysis?.breakdowns?.paths || projectStats?.paths || {})} 个页面`
+                                  : `${getTotalCount(projectAnalysis?.breakdowns?.paths || projectStats?.paths || {})} pages`)">
+                    </span>
                 </div>
+                <p class="text-xs text-gray-500 mt-1" x-text="t('pagesBreakdownDesc')"></p>
             </div>
-            <div class="space-y-3" x-show="getPaginatedEntries(projectAnalysis.breakdowns.paths, breakdownPages.paths || 1, 8).length > 0">
-                <template x-for="entry in getPaginatedEntries(projectAnalysis.breakdowns.paths, breakdownPages.paths || 1, 8)" :key="entry[0]">
-                    <div class="flex items-center justify-between gap-4">
-                        <span class="text-gray-700 truncate flex-1 text-sm" x-text="formatBadgePath(entry[0])" :title="entry[0]"></span>
-                        <div class="flex items-center space-x-2 shrink-0">
-                            <div class="w-32 bg-gray-200 rounded-full h-2">
-                                <div class="bg-blue-500 h-2 rounded-full" :style="getBarStyle(entry[1], projectAnalysis.breakdowns.paths)"></div>
-                            </div>
-                            <span class="text-sm text-gray-500 min-w-8 text-right font-medium" x-text="entry[1]"></span>
-                        </div>
-                    </div>
-                </template>
+
+            <!-- Realtime search input with clear icon -->
+            <div class="relative w-full sm:w-72 shrink-0">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                </div>
+                <input
+                    type="text"
+                    x-model="pageSearchQuery"
+                    @input="pagesPage = 1"
+                    :placeholder="t('searchPagesPlaceholder')"
+                    class="w-full pl-9 pr-8 py-1.5 text-xs rounded-lg border border-gray-200 bg-gray-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 transition-colors"
+                >
+                <button
+                    x-show="pageSearchQuery"
+                    @click="pageSearchQuery = ''; pagesPage = 1"
+                    type="button"
+                    class="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                    title="Clear search">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
             </div>
-            <p x-show="getTotalCount(projectAnalysis.breakdowns.paths) === 0" class="text-gray-500 text-center py-4 text-sm" x-text="t('noData')"></p>
         </div>
 
+        <!-- Table -->
+        <div x-show="getFilteredPages(projectAnalysis?.breakdowns?.paths || projectStats?.paths || {}, pageSearchQuery).length > 0" class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-100">
+                <thead>
+                    <tr class="text-xs uppercase tracking-wider text-gray-400 border-b border-gray-100">
+                        <th class="w-16 py-3 pl-3 pr-3 text-left font-medium" x-text="t('pageRank')"></th>
+                        <th class="py-3 px-3 text-left font-medium" x-text="t('pagePath')"></th>
+                        <th class="w-28 py-3 px-3 text-right font-medium" x-text="t('pageViews')"></th>
+                        <th class="w-48 py-3 px-3 text-left font-medium" x-text="t('pageShare')"></th>
+                        <th class="w-20 py-3 pl-3 pr-3 text-center font-medium" x-text="t('pageActions')"></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    <template x-for="(item, index) in getPaginatedFilteredPages(projectAnalysis?.breakdowns?.paths || projectStats?.paths || {}, pageSearchQuery, pagesPage, pagesPageSize)" :key="item.path">
+                        <tr class="hover:bg-gray-50/80 transition-colors">
+                            <!-- 1. 排名 (Rank: #1, #2, #3 styled badges) -->
+                            <td class="py-3 pl-3 pr-3 whitespace-nowrap text-left">
+                                <span class="inline-flex h-5 min-w-5 px-1.5 items-center justify-center rounded-full text-[11px] font-bold shrink-0 font-mono"
+                                      :class="getPageRankClass(getPageRank(index, pagesPage, pagesPageSize))"
+                                      x-text="`#${getPageRank(index, pagesPage, pagesPageSize)}`">
+                                </span>
+                            </td>
 
+                            <!-- 2. 受访页面路径 (Page Path: font-mono text with copy button) -->
+                            <td class="py-3 px-3 text-left">
+                                <div class="flex items-center gap-2 max-w-full">
+                                    <span class="font-mono text-xs text-gray-800 break-all select-all font-medium"
+                                          :title="item.path"
+                                          x-text="item.path">
+                                    </span>
+                                    <button
+                                        @click="copyText(item.path)"
+                                        type="button"
+                                        class="p-1 rounded text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-colors shrink-0"
+                                        :title="t('copy')">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </td>
 
+                            <!-- 3. 浏览量 (Pageviews PV: bold font-mono number) -->
+                            <td class="py-3 px-3 whitespace-nowrap text-right">
+                                <span class="font-mono text-xs font-bold text-gray-900" x-text="item.count.toLocaleString()"></span>
+                            </td>
+
+                            <!-- 4. 占比 (Share: percentage text + horizontal progress bar) -->
+                            <td class="py-3 px-3 whitespace-nowrap">
+                                <div class="flex items-center gap-2.5">
+                                    <div class="w-20 sm:w-28 bg-gray-100 rounded-full h-2 overflow-hidden shrink-0">
+                                        <div class="bg-purple-600 h-full rounded-full transition-all duration-300"
+                                             :style="`width: ${Math.min(100, Math.max(item.percentage, 0))}%`"></div>
+                                    </div>
+                                    <span class="font-mono text-xs font-semibold text-gray-600 w-12 text-right shrink-0"
+                                          x-text="`${item.percentage}%`">
+                                    </span>
+                                </div>
+                            </td>
+
+                            <!-- 5. 操作 (Actions: link-out preview button target="_blank") -->
+                            <td class="py-3 pl-3 pr-3 whitespace-nowrap text-center">
+                                <a :href="getPagePreviewUrl(item.path)"
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   class="p-1 rounded text-purple-600 hover:text-purple-800 hover:bg-purple-50 transition-colors inline-flex items-center"
+                                   :title="lang === 'zh' ? '在新窗口打开预览' : 'Open preview in new tab'">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                                    </svg>
+                                </a>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Empty State: Filtered with no matches -->
+        <div x-show="getTotalCount(projectAnalysis?.breakdowns?.paths || projectStats?.paths || {}) > 0 && getFilteredPages(projectAnalysis?.breakdowns?.paths || projectStats?.paths || {}, pageSearchQuery).length === 0" class="text-center py-10">
+            <svg class="w-10 h-10 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+            <p class="text-xs text-gray-500 font-medium" x-text="t('noMatchingPages')"></p>
+            <button @click="pageSearchQuery = ''; pagesPage = 1" type="button" class="mt-2 inline-flex items-center gap-1 text-xs text-purple-600 hover:text-purple-800 font-medium underline">
+                <span x-text="t('resetFilters')"></span>
+            </button>
+        </div>
+
+        <!-- Empty State: No data recorded at all -->
+        <div x-show="getTotalCount(projectAnalysis?.breakdowns?.paths || projectStats?.paths || {}) === 0" class="text-center py-10">
+            <svg class="w-10 h-10 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            <p class="text-xs text-gray-400" x-text="t('noData')"></p>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-gray-100 pt-4 mt-4"
+             x-show="getFilteredPages(projectAnalysis?.breakdowns?.paths || projectStats?.paths || {}, pageSearchQuery).length > 0">
+            <div class="text-xs text-gray-500 font-mono">
+                <span x-text="lang === 'zh'
+                    ? `第 ${pagesPage} / ${getTotalPagesForFiltered(projectAnalysis?.breakdowns?.paths || projectStats?.paths || {}, pageSearchQuery, pagesPageSize)} 页 (共 ${getFilteredPages(projectAnalysis?.breakdowns?.paths || projectStats?.paths || {}, pageSearchQuery).length} 条)`
+                    : `Page ${pagesPage} of ${getTotalPagesForFiltered(projectAnalysis?.breakdowns?.paths || projectStats?.paths || {}, pageSearchQuery, pagesPageSize)} (${getFilteredPages(projectAnalysis?.breakdowns?.paths || projectStats?.paths || {}, pageSearchQuery).length} items)`">
+                </span>
+            </div>
+            <div class="flex items-center gap-2" x-show="getTotalPagesForFiltered(projectAnalysis?.breakdowns?.paths || projectStats?.paths || {}, pageSearchQuery, pagesPageSize) > 1">
+                <button
+                    @click="pagesPage = Math.max(1, pagesPage - 1)"
+                    :disabled="pagesPage <= 1"
+                    type="button"
+                    class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-xs">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                    <span x-text="t('prevPage')"></span>
+                </button>
+                <button
+                    @click="pagesPage = Math.min(getTotalPagesForFiltered(projectAnalysis?.breakdowns?.paths || projectStats?.paths || {}, pageSearchQuery, pagesPageSize), pagesPage + 1)"
+                    :disabled="pagesPage >= getTotalPagesForFiltered(projectAnalysis?.breakdowns?.paths || projectStats?.paths || {}, pageSearchQuery, pagesPageSize)"
+                    type="button"
+                    class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-xs">
+                    <span x-text="t('nextPage')"></span>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 核心流量构成 (带分页) -->
+    <div class="grid md:grid-cols-2 gap-6">
 
         <!-- siteSearch -->
         <div class="bg-white rounded-xl shadow-sm p-6 stat-card">

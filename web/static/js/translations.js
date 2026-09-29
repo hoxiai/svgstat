@@ -396,7 +396,17 @@ export const translations = {
 		aiAgentBadge: 'AI Agent',
 		aiVisitsCount: 'AI Visits',
 		noIPVisitors: 'No IP visitor records for today.',
-		prevPage: 'Previous'
+		prevPage: 'Previous',
+		pagesBreakdown: 'Visited Pages Breakdown',
+		pagesBreakdownDesc: 'Detailed breakdown of visited paths, pageview counts, and traffic share',
+		pageRank: 'Rank',
+		pagePath: 'Page Path',
+		pageViews: 'Pageviews (PV)',
+		pageShare: 'Share',
+		pageActions: 'Actions',
+		actions: 'Actions',
+		searchPagesPlaceholder: 'Search page paths...',
+		noMatchingPages: 'No matching pages found'
     },
     zh: {
         dashboard: '控制台',
@@ -795,7 +805,17 @@ export const translations = {
 		aiAgentBadge: 'AI 智能体',
 		aiVisitsCount: 'AI 访问次数',
 		noIPVisitors: '今日暂无 IP 访问记录。',
-		prevPage: '上一页'
+		prevPage: '上一页',
+		pagesBreakdown: '受访页面明细',
+		pagesBreakdownDesc: '网站各受访页面路径明细、浏览量分布及流量占比',
+		pageRank: '排名',
+		pagePath: '受访页面路径',
+		pageViews: '浏览量 (PV)',
+		pageShare: '占比',
+		pageActions: '操作',
+		actions: '操作',
+		searchPagesPlaceholder: '搜索页面路径...',
+		noMatchingPages: '未找到匹配的受访页面'
     }
 };
 
