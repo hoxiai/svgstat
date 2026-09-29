@@ -53,7 +53,7 @@
                 <h3 class="font-semibold text-gray-900 text-base" x-text="t('todayOverview')"></h3>
                 <p class="text-xs text-gray-400 mt-0.5" x-text="projectOverview?.date ? `${projectOverview.date} (UTC)` : ''"></p>
             </div>
-            <div x-show="loadingOverview || loadingStats" class="animate-spin w-5 h-5 border-2 border-purple-200 border-purple-600 rounded-full"></div>
+            <div x-show="(!projectOverview && loadingOverview) || (!projectStats?.pv && loadingStats)" class="animate-spin w-5 h-5 border-2 border-purple-200 border-purple-600 rounded-full"></div>
         </div>
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <!-- 今日 PV -->

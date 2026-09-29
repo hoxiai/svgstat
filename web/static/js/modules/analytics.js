@@ -55,10 +55,12 @@ export function createAnalyticsMethods() {
             }
         },
 
-        async loadProjectOverview(projectId, force = false) {
+        async loadProjectOverview(projectId, force = false, isSilent = false) {
             if (!projectId) return;
             const requestId = ++this.overviewRequestId;
-            this.loadingOverview = true;
+            if (!isSilent && !this.projectOverview) {
+                this.loadingOverview = true;
+            }
             try {
                 const res = await fetch(`/api/v1/projects/${projectId}/stats/overview`, { credentials: 'same-origin' });
                 const data = await res.json();
@@ -81,16 +83,27 @@ export function createAnalyticsMethods() {
             }
         },
 
-        async loadVisitStream(projectId) {
+        async loadVisitStream(projectId, isSilent = false) {
             if (!projectId) return;
             const requestId = ++this.visitStreamRequestId;
-            this.loadingVisitStream = true;
+            if (!isSilent && (!this.visitStream || this.visitStream.length === 0)) {
+                this.loadingVisitStream = true;
+            }
             try {
                 const res = await fetch(`/api/v1/projects/${projectId}/visit-stream?limit=50`, { credentials: 'same-origin' });
                 const data = await res.json();
                 if (requestId !== this.visitStreamRequestId || this.selectedProject?.id !== projectId) return;
                 if (data.success) {
-                    this.visitStream = data.data || [];
+                    const incoming = data.data || [];
+                    if (!this.visitStream || this.visitStream.length === 0) {
+                        this.visitStream = incoming;
+                    } else {
+                        const existingIds = new Set(this.visitStream.map(item => item.id));
+                        const newItems = incoming.filter(item => !existingIds.has(item.id));
+                        if (newItems.length > 0) {
+                            this.visitStream = [...newItems, ...this.visitStream].slice(0, 50);
+                        }
+                    }
                 }
             } catch (e) {
                 console.error('Failed to load visit stream', e);
@@ -104,7 +117,7 @@ export function createAnalyticsMethods() {
             if (!this.autoRefreshStream) return;
             this.streamInterval = setInterval(() => {
                 if (this.currentPage === 'project-detail' && this.selectedProject?.id === projectId && this.projectTab === 'visitors' && this.autoRefreshStream) {
-                    this.loadVisitStream(projectId);
+                    this.loadVisitStream(projectId, true);
                 }
             }, 5000);
         },
@@ -128,12 +141,16 @@ export function createAnalyticsMethods() {
             }
         },
 
-        async loadAnalysis(projectId, force = false) {
+        async loadAnalysis(projectId, force = false, isSilent = false) {
             if (!projectId) return;
             const requestId = ++this.analysisRequestId;
             const requestedDays = this.trendDays;
-            if (!force) this.projectAnalysis = createEmptyAnalysis(requestedDays);
-            this.loadingAnalysis = true;
+            if (!isSilent && !this.projectAnalysis) {
+                this.loadingAnalysis = true;
+            }
+            if (!this.projectAnalysis) {
+                this.projectAnalysis = createEmptyAnalysis(requestedDays);
+            }
             try {
                 const res = await fetch(`/api/v1/projects/${projectId}/analysis?days=${requestedDays}`, { credentials: 'same-origin' });
                 const data = await res.json();
@@ -363,21 +380,21 @@ export function createAnalyticsMethods() {
                 this.loadRealtime(projectId);
                 this.loadInstallation(projectId);
                 if (this.projectTab === 'overview') {
-                    this.loadProjectOverview(projectId, true);
-                    this.loadStats(projectId, true);
-                    this.loadTrend(projectId, true);
-                    this.loadAnalysis(projectId, true);
+                    this.loadProjectOverview(projectId, true, true);
+                    this.loadStats(projectId, true, true);
+                    this.loadTrend(projectId, true, true);
+                    this.loadAnalysis(projectId, true, true);
                     this.loadIssues(projectId, true);
                 } else if (this.projectTab === 'growth') {
                     this.loadConversions(projectId);
-                    this.loadAnalysis(projectId, true);
+                    this.loadAnalysis(projectId, true, true);
                 } else if (this.projectTab === 'quality') {
                     this.loadSessionQuality(projectId, true);
                     this.loadConversions(projectId);
                 } else if (this.projectTab === 'diagnostics') {
                     this.loadDiagnostics(projectId);
                 } else if (this.projectTab === 'visitors') {
-                    this.loadVisitStream(projectId);
+                    this.loadVisitStream(projectId, true);
                 }
             }, 30000);
             if (this.projectTab === 'diagnostics') {
@@ -457,14 +474,17 @@ export function createAnalyticsMethods() {
             this.loadVisitors(this.selectedProject.id, nextPage);
         },
         
-        async loadStats(projectId, force = false) {
+        async loadStats(projectId, force = false, isSilent = false) {
             if (!projectId) return;
             if (!force && this.lastLoadedStatsProjectId === projectId) return;
 
             this.lastLoadedStatsProjectId = projectId;
-            this.loadingStats = true;
-            this.expandedVisitorId = null;
-            this.projectStats = createEmptyProjectStats();
+            if (!isSilent && (!this.projectStats || !this.projectStats.pv)) {
+                this.loadingStats = true;
+            }
+            if (!this.projectStats) {
+                this.projectStats = createEmptyProjectStats();
+            }
             try {
                 const res = await fetch(`/api/v1/projects/${projectId}/stats`, { credentials: 'same-origin' });
                 const data = await res.json();
@@ -482,15 +502,19 @@ export function createAnalyticsMethods() {
             }
         },
 
-        async loadTrend(projectId, force = false) {
+        async loadTrend(projectId, force = false, isSilent = false) {
             if (!projectId) return;
             const requestedDays = this.trendDays;
             const requestKey = `${projectId}:${requestedDays}`;
             if (!force && this.loadingTrend && this.trendRequestKey === requestKey) return;
             const requestId = ++this.trendRequestId;
             this.trendRequestKey = requestKey;
-            this.loadingTrend = true;
-            this.projectTrend = createEmptyTrend(requestedDays);
+            if (!isSilent && (!this.projectTrend || !this.projectTrend.totals)) {
+                this.loadingTrend = true;
+            }
+            if (!this.projectTrend) {
+                this.projectTrend = createEmptyTrend(requestedDays);
+            }
             try {
                 const res = await fetch(`/api/v1/projects/${projectId}/stats/trend?days=${requestedDays}`, { credentials: 'same-origin' });
                 const data = await res.json();
