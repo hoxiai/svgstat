@@ -1050,7 +1050,7 @@ func (a *App) handleCounterSVG(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !preview {
-		_ = a.analytics.TrackRequest(r.Context(), r, proj.ID)
+		_ = a.analytics.TrackBadgeOrCounter(r.Context(), r, proj.ID)
 	}
 
 	color := r.URL.Query().Get("color")
@@ -1114,7 +1114,7 @@ func (a *App) handleBadgeSVG(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !preview {
-		_ = a.analytics.TrackRequest(r.Context(), r, proj.ID)
+		_ = a.analytics.TrackBadgeOrCounter(r.Context(), r, proj.ID)
 	}
 
 	color := r.URL.Query().Get("color")
