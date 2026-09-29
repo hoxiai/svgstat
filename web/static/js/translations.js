@@ -406,7 +406,11 @@ export const translations = {
 		pageActions: 'Actions',
 		actions: 'Actions',
 		searchPagesPlaceholder: 'Search page paths...',
-		noMatchingPages: 'No matching pages found'
+		noMatchingPages: 'No matching pages found',
+		viewPagesBreakdownHint: 'View Pages Breakdown →',
+		viewStreamHint: 'View Realtime Stream →',
+		viewIpListHint: 'View Today IP List →',
+		viewQualityHint: 'View Session Quality →'
     },
     zh: {
         dashboard: '控制台',
@@ -815,7 +819,11 @@ export const translations = {
 		pageActions: '操作',
 		actions: '操作',
 		searchPagesPlaceholder: '搜索页面路径...',
-		noMatchingPages: '未找到匹配的受访页面'
+		noMatchingPages: '未找到匹配的受访页面',
+		viewPagesBreakdownHint: '查看受访页面明细 →',
+		viewStreamHint: '查看实时访问流水 →',
+		viewIpListHint: '查看今日 IP 列表 →',
+		viewQualityHint: '查看会话质量分析 →'
     }
 };
 

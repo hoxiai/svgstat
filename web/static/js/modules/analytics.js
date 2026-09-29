@@ -169,6 +169,38 @@ export function createAnalyticsMethods() {
             return this.visitStream;
         },
 
+        navigateToPagesBreakdown() {
+            if (this.projectTab !== 'overview') {
+                this.setProjectTab('overview');
+            }
+            this.setHourlyMetric('pv');
+            const scroll = () => {
+                const el = document.getElementById('pages-breakdown-section');
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth' });
+                }
+            };
+            if (typeof this.$nextTick === 'function') {
+                this.$nextTick(scroll);
+            } else {
+                setTimeout(scroll, 50);
+            }
+        },
+
+        navigateToStreamVisitors() {
+            this.setProjectTab('visitors');
+            this.switchVisitorViewMode('stream');
+        },
+
+        navigateToIpVisitors() {
+            this.setProjectTab('visitors');
+            this.switchVisitorViewMode('ip');
+        },
+
+        navigateToQuality() {
+            this.setProjectTab('quality');
+        },
+
         async loadAnalysis(projectId, force = false, isSilent = false) {
             if (!projectId) return;
             const requestId = ++this.analysisRequestId;

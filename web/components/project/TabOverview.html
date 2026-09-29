@@ -65,91 +65,143 @@
         </div>
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <!-- 今日 PV -->
-            <div class="bg-gradient-to-br from-purple-50/80 to-purple-100/50 rounded-xl p-4 border border-purple-100/80 flex flex-col justify-between">
+            <div @click="navigateToPagesBreakdown()"
+                 role="button"
+                 tabindex="0"
+                 @keydown.enter="navigateToPagesBreakdown()"
+                 :title="t('viewPagesBreakdownHint')"
+                 class="group cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all bg-gradient-to-br from-purple-50/80 to-purple-100/50 rounded-xl p-4 border border-purple-100/80 flex flex-col justify-between">
                 <div>
                     <div class="flex items-center justify-between">
                         <span class="text-xs font-medium text-gray-500 uppercase tracking-wider" x-text="t('todayPV')"></span>
-                        <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                            <span class="text-purple-400 group-hover:text-purple-600 group-hover:translate-x-0.5 transition-all text-xs font-bold">↗</span>
+                        </div>
                     </div>
                     <div class="text-3xl font-extrabold text-purple-700 mt-2 font-mono tracking-tight" x-text="projectOverview?.pv != null ? projectOverview.pv.toLocaleString() : (projectStats.pv || 0).toLocaleString()"></div>
                 </div>
-                <div class="mt-4 pt-3 border-t border-purple-100/60 space-y-1.5">
-                    <div class="flex items-center justify-between text-xs">
-                        <span class="text-gray-500" x-text="t('yesterdaySamePeriod')"></span>
-                        <span class="font-medium px-1.5 py-0.5 rounded border text-[11px]"
-                              :class="getPercentageChangeColorClass(projectOverview?.changes?.pv)"
-                              x-text="formatPercentageChangeWithArrow(projectOverview?.changes?.pv)"></span>
+                <div>
+                    <div class="mt-4 pt-3 border-t border-purple-100/60 space-y-1.5">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="text-gray-500" x-text="t('yesterdaySamePeriod')"></span>
+                            <span class="font-medium px-1.5 py-0.5 rounded border text-[11px]"
+                                  :class="getPercentageChangeColorClass(projectOverview?.changes?.pv)"
+                                  x-text="formatPercentageChangeWithArrow(projectOverview?.changes?.pv)"></span>
+                        </div>
+                        <div class="flex items-center justify-between text-xs text-gray-500">
+                            <span x-text="t('yesterdayFullDay')"></span>
+                            <span class="font-mono font-medium text-gray-700" x-text="projectOverview?.yesterdayFull?.pv != null ? projectOverview.yesterdayFull.pv.toLocaleString() : '—'"></span>
+                        </div>
                     </div>
-                    <div class="flex items-center justify-between text-xs text-gray-500">
-                        <span x-text="t('yesterdayFullDay')"></span>
-                        <span class="font-mono font-medium text-gray-700" x-text="projectOverview?.yesterdayFull?.pv != null ? projectOverview.yesterdayFull.pv.toLocaleString() : '—'"></span>
+                    <div class="mt-2.5 pt-2 border-t border-purple-200/40 flex items-center justify-end">
+                        <span class="text-[11px] font-medium text-purple-600/80 group-hover:text-purple-700 group-hover:underline flex items-center gap-0.5" x-text="t('viewPagesBreakdownHint')"></span>
                     </div>
                 </div>
             </div>
 
             <!-- 今日 UV -->
-            <div class="bg-gradient-to-br from-blue-50/80 to-blue-100/50 rounded-xl p-4 border border-blue-100/80 flex flex-col justify-between">
+            <div @click="navigateToStreamVisitors()"
+                 role="button"
+                 tabindex="0"
+                 @keydown.enter="navigateToStreamVisitors()"
+                 :title="t('viewStreamHint')"
+                 class="group cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all bg-gradient-to-br from-blue-50/80 to-blue-100/50 rounded-xl p-4 border border-blue-100/80 flex flex-col justify-between">
                 <div>
                     <div class="flex items-center justify-between">
                         <span class="text-xs font-medium text-gray-500 uppercase tracking-wider" x-text="t('todayUV')"></span>
-                        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                            <span class="text-blue-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all text-xs font-bold">↗</span>
+                        </div>
                     </div>
                     <div class="text-3xl font-extrabold text-blue-700 mt-2 font-mono tracking-tight" x-text="projectOverview?.uv != null ? projectOverview.uv.toLocaleString() : (projectStats.uv || 0).toLocaleString()"></div>
                 </div>
-                <div class="mt-4 pt-3 border-t border-blue-100/60 space-y-1.5">
-                    <div class="flex items-center justify-between text-xs">
-                        <span class="text-gray-500" x-text="t('yesterdaySamePeriod')"></span>
-                        <span class="font-medium px-1.5 py-0.5 rounded border text-[11px]"
-                              :class="getPercentageChangeColorClass(projectOverview?.changes?.uv)"
-                              x-text="formatPercentageChangeWithArrow(projectOverview?.changes?.uv)"></span>
+                <div>
+                    <div class="mt-4 pt-3 border-t border-blue-100/60 space-y-1.5">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="text-gray-500" x-text="t('yesterdaySamePeriod')"></span>
+                            <span class="font-medium px-1.5 py-0.5 rounded border text-[11px]"
+                                  :class="getPercentageChangeColorClass(projectOverview?.changes?.uv)"
+                                  x-text="formatPercentageChangeWithArrow(projectOverview?.changes?.uv)"></span>
+                        </div>
+                        <div class="flex items-center justify-between text-xs text-gray-500">
+                            <span x-text="t('yesterdayFullDay')"></span>
+                            <span class="font-mono font-medium text-gray-700" x-text="projectOverview?.yesterdayFull?.uv != null ? projectOverview.yesterdayFull.uv.toLocaleString() : '—'"></span>
+                        </div>
                     </div>
-                    <div class="flex items-center justify-between text-xs text-gray-500">
-                        <span x-text="t('yesterdayFullDay')"></span>
-                        <span class="font-mono font-medium text-gray-700" x-text="projectOverview?.yesterdayFull?.uv != null ? projectOverview.yesterdayFull.uv.toLocaleString() : '—'"></span>
+                    <div class="mt-2.5 pt-2 border-t border-blue-200/40 flex items-center justify-end">
+                        <span class="text-[11px] font-medium text-blue-600/80 group-hover:text-blue-700 group-hover:underline flex items-center gap-0.5" x-text="t('viewStreamHint')"></span>
                     </div>
                 </div>
             </div>
 
             <!-- 今日 IP -->
-            <div class="bg-gradient-to-br from-teal-50/80 to-teal-100/50 rounded-xl p-4 border border-teal-100/80 flex flex-col justify-between">
+            <div @click="navigateToIpVisitors()"
+                 role="button"
+                 tabindex="0"
+                 @keydown.enter="navigateToIpVisitors()"
+                 :title="t('viewIpListHint')"
+                 class="group cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all bg-gradient-to-br from-teal-50/80 to-teal-100/50 rounded-xl p-4 border border-teal-100/80 flex flex-col justify-between">
                 <div>
                     <div class="flex items-center justify-between">
                         <span class="text-xs font-medium text-gray-500 uppercase tracking-wider" x-text="t('todayIP')"></span>
-                        <span class="w-2 h-2 rounded-full bg-teal-500"></span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-teal-500"></span>
+                            <span class="text-teal-400 group-hover:text-teal-600 group-hover:translate-x-0.5 transition-all text-xs font-bold">↗</span>
+                        </div>
                     </div>
                     <div class="text-3xl font-extrabold text-teal-700 mt-2 font-mono tracking-tight" x-text="projectOverview?.ip != null ? projectOverview.ip.toLocaleString() : (projectStats.ip || 0).toLocaleString()"></div>
                 </div>
-                <div class="mt-4 pt-3 border-t border-teal-100/60 space-y-1.5">
-                    <div class="flex items-center justify-between text-xs">
-                        <span class="text-gray-500" x-text="t('yesterdaySamePeriod')"></span>
-                        <span class="font-medium px-1.5 py-0.5 rounded border text-[11px]"
-                              :class="getPercentageChangeColorClass(projectOverview?.changes?.ip)"
-                              x-text="formatPercentageChangeWithArrow(projectOverview?.changes?.ip)"></span>
+                <div>
+                    <div class="mt-4 pt-3 border-t border-teal-100/60 space-y-1.5">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="text-gray-500" x-text="t('yesterdaySamePeriod')"></span>
+                            <span class="font-medium px-1.5 py-0.5 rounded border text-[11px]"
+                                  :class="getPercentageChangeColorClass(projectOverview?.changes?.ip)"
+                                  x-text="formatPercentageChangeWithArrow(projectOverview?.changes?.ip)"></span>
+                        </div>
+                        <div class="flex items-center justify-between text-xs text-gray-500">
+                            <span x-text="t('yesterdayFullDay')"></span>
+                            <span class="font-mono font-medium text-gray-700" x-text="projectOverview?.yesterdayFull?.ip != null ? projectOverview.yesterdayFull.ip.toLocaleString() : '—'"></span>
+                        </div>
                     </div>
-                    <div class="flex items-center justify-between text-xs text-gray-500">
-                        <span x-text="t('yesterdayFullDay')"></span>
-                        <span class="font-mono font-medium text-gray-700" x-text="projectOverview?.yesterdayFull?.ip != null ? projectOverview.yesterdayFull.ip.toLocaleString() : '—'"></span>
+                    <div class="mt-2.5 pt-2 border-t border-teal-200/40 flex items-center justify-end">
+                        <span class="text-[11px] font-medium text-teal-600/80 group-hover:text-teal-700 group-hover:underline flex items-center gap-0.5" x-text="t('viewIpListHint')"></span>
                     </div>
                 </div>
             </div>
 
             <!-- 人均浏览量 (PV/UV) -->
-            <div class="bg-gradient-to-br from-amber-50/80 to-amber-100/50 rounded-xl p-4 border border-amber-100/80 flex flex-col justify-between">
+            <div @click="navigateToQuality()"
+                 role="button"
+                 tabindex="0"
+                 @keydown.enter="navigateToQuality()"
+                 :title="t('viewQualityHint')"
+                 class="group cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all bg-gradient-to-br from-amber-50/80 to-amber-100/50 rounded-xl p-4 border border-amber-100/80 flex flex-col justify-between">
                 <div>
                     <div class="flex items-center justify-between">
                         <span class="text-xs font-medium text-gray-500 uppercase tracking-wider" x-text="t('avgPVPerUser')"></span>
-                        <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                            <span class="text-amber-400 group-hover:text-amber-600 group-hover:translate-x-0.5 transition-all text-xs font-bold">↗</span>
+                        </div>
                     </div>
                     <div class="text-3xl font-extrabold text-amber-700 mt-2 font-mono tracking-tight" x-text="projectOverview?.avgPageviewsPerUser != null ? projectOverview.avgPageviewsPerUser.toFixed(2) : (projectOverview?.uv > 0 ? (projectOverview.pv / projectOverview.uv).toFixed(2) : '0.00')"></div>
                 </div>
-                <div class="mt-4 pt-3 border-t border-amber-100/60 space-y-1.5">
-                    <div class="flex items-center justify-between text-xs">
-                        <span class="text-gray-500">PV / UV</span>
-                        <span class="font-medium text-amber-700 bg-amber-100/80 px-1.5 py-0.5 rounded text-[11px]">Ratio</span>
+                <div>
+                    <div class="mt-4 pt-3 border-t border-amber-100/60 space-y-1.5">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="text-gray-500">PV / UV</span>
+                            <span class="font-medium text-amber-700 bg-amber-100/80 px-1.5 py-0.5 rounded text-[11px]">Ratio</span>
+                        </div>
+                        <div class="flex items-center justify-between text-xs text-gray-500">
+                            <span x-text="t('yesterdayFullDay')"></span>
+                            <span class="font-mono font-medium text-gray-700" x-text="projectOverview?.yesterdayFull?.uv > 0 ? (projectOverview.yesterdayFull.pv / projectOverview.yesterdayFull.uv).toFixed(2) : '—'"></span>
+                        </div>
                     </div>
-                    <div class="flex items-center justify-between text-xs text-gray-500">
-                        <span x-text="t('yesterdayFullDay')"></span>
-                        <span class="font-mono font-medium text-gray-700" x-text="projectOverview?.yesterdayFull?.uv > 0 ? (projectOverview.yesterdayFull.pv / projectOverview.yesterdayFull.uv).toFixed(2) : '—'"></span>
+                    <div class="mt-2.5 pt-2 border-t border-amber-200/40 flex items-center justify-end">
+                        <span class="text-[11px] font-medium text-amber-600/80 group-hover:text-amber-700 group-hover:underline flex items-center gap-0.5" x-text="t('viewQualityHint')"></span>
                     </div>
                 </div>
             </div>
@@ -475,7 +527,7 @@
     </div>
 
     <!-- 4. 受访页面明细 (Visited Pages Breakdown - Dedicated Full-Width Card) -->
-    <div class="bg-white rounded-xl shadow-sm p-6 stat-card">
+    <div id="pages-breakdown-section" class="bg-white rounded-xl shadow-sm p-6 stat-card scroll-mt-6">
         <!-- Card Header -->
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-4 border-b border-gray-100">
             <div>
