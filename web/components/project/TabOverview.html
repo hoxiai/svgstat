@@ -60,7 +60,7 @@
                         <span x-text="lang === 'zh' ? `今日 AI 探测: ${projectOverview.todayAi} 次` : `AI Visits: ${projectOverview.todayAi}`"></span>
                     </span>
                 </template>
-                <div x-show="(!projectOverview && loadingOverview) || (!projectStats?.pv && loadingStats)" class="animate-spin w-5 h-5 border-2 border-purple-200 border-purple-600 rounded-full"></div>
+                <div x-show="(!projectOverview && loadingOverview) || (!projectStats?.pv && loadingStats)" class="animate-spin w-5 h-5 border-2 border-purple-200 border-t-purple-600 rounded-full"></div>
             </div>
         </div>
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">

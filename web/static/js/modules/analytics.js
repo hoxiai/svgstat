@@ -95,7 +95,8 @@ export function createAnalyticsMethods() {
                 if (requestId !== this.visitStreamRequestId || this.selectedProject?.id !== projectId) return;
                 if (data.success) {
                     const incoming = data.data || [];
-                    if (!this.visitStream || this.visitStream.length === 0) {
+                    if (this.lastLoadedVisitStreamProjectId !== projectId || !this.visitStream || this.visitStream.length === 0) {
+                        this.lastLoadedVisitStreamProjectId = projectId;
                         this.visitStream = incoming;
                     } else {
                         const existingIds = new Set(this.visitStream.map(item => item.id));

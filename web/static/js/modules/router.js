@@ -72,6 +72,8 @@ export function createRouterMethods() {
                 this.sessionSegmentsPage = 1;
                 this.pagesPage = 1;
                 this.pageSearchQuery = '';
+                this.visitStream = [];
+                this.lastLoadedVisitStreamProjectId = '';
 
                 const rawHash = window.location.hash.replace(/^#/, '');
                 const validTabs = ['overview', 'growth', 'quality', 'visitors', 'diagnostics'];

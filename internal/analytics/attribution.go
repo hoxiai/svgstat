@@ -159,10 +159,14 @@ func websiteAttribution(rawPath, rawReferrer, siteHost string) Attribution {
 	result.Term = cleanDimension(query.Get("utm_term"))
 
 	refSource, refMedium, refTerm := "direct", "none", ""
-	if parsed, err := url.Parse(strings.TrimSpace(rawReferrer)); err == nil && parsed.Hostname() != "" {
+	refToParse := strings.TrimSpace(rawReferrer)
+	if refToParse != "" && !strings.Contains(refToParse, "://") {
+		refToParse = "https://" + refToParse
+	}
+	if parsed, err := url.Parse(refToParse); err == nil && parsed.Hostname() != "" {
 		host := strings.ToLower(parsed.Hostname())
 		if !sameSite(host, siteHost) {
-			result.Referrer = cleanReferrer(rawReferrer)
+			result.Referrer = cleanReferrer(refToParse)
 			refSource, refMedium = classifyReferrerHost(host)
 			// Google's /url redirector carries the destination in q, not a search.
 			if refMedium == "organic" && parsed.Path != "/url" {

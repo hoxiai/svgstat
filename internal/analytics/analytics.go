@@ -259,10 +259,17 @@ func (a *Analytics) TrackPageview(ctx context.Context, req *http.Request, projec
 func (a *Analytics) TrackBadgeOrCounter(ctx context.Context, req *http.Request, projectID string) error {
 	data := a.extractRequestData(req, projectID)
 	referrer := req.Referer()
+	if referrer == "" && data.Referrer != "" {
+		referrer = data.Referrer
+	}
 	path := ""
 	if referrer != "" {
-		if refURL, err := url.Parse(referrer); err == nil && refURL.Path != "" {
-			path = refURL.Path
+		if refURL, err := url.Parse(referrer); err == nil {
+			if refURL.Path != "" {
+				path = refURL.Path
+			} else if refURL.Hostname() != "" {
+				path = "/"
+			}
 		}
 	}
 	if path == "" && req.URL != nil && req.URL.Path != "" {

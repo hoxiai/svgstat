@@ -62,7 +62,7 @@
                 </button>
 
                 <!-- Count badge -->
-                <span class="font-mono text-xs text-gray-400" x-show="visitorViewMode === 'stream' && visitStream.length > 0" x-text="`${getFilteredVisitStream().length} items`"></span>
+                <span class="font-mono text-xs text-gray-400" x-show="visitorViewMode === 'stream' && visitStream.length > 0" x-text="lang === 'zh' ? `共 ${getFilteredVisitStream().length} 条访问记录` : `${getFilteredVisitStream().length} items`"></span>
                 <span class="font-mono text-xs text-gray-400" x-show="visitorViewMode === 'ip' && visitorsPage.total > 0" x-text="lang === 'zh' ? `共 ${visitorsPage.total} 个 IP` : `${visitorsPage.total} IPs`"></span>
             </div>
         </div>

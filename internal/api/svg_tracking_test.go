@@ -235,10 +235,10 @@ func TestSVGTracking_ReferrerPathExtraction(t *testing.T) {
 			wantPath: "/",
 		},
 		{
-			name:     "referer without path falls back to req.URL.Path",
+			name:     "referer without path defaults to root path /",
 			referer:  "https://myblog.com",
 			reqPath:  "/svg/ref-project/counter/views.svg",
-			wantPath: "/svg/ref-project/counter/views.svg",
+			wantPath: "/",
 		},
 		{
 			name:     "empty referer falls back to req.URL.Path",
@@ -286,5 +286,45 @@ func TestSVGTracking_ReferrerPathExtraction(t *testing.T) {
 				t.Errorf("expected path %q count = 1, got paths: %v", tt.wantPath, stats.Paths)
 			}
 		})
+	}
+}
+
+func TestSVGTracking_CamoProxyReferrerPreserved(t *testing.T) {
+	proj := &project.Project{
+		ID:            "camo-test-project",
+		Slug:          "camo-test-slug",
+		Status:        "active",
+		RenderEnabled: true,
+	}
+	_, analyticsSvc, projectID := newSVGTestAPIApp(t, proj)
+	ctx := context.Background()
+
+	subProjID := fmt.Sprintf("%s-camo-%d", projectID, time.Now().UnixNano())
+	req := httptest.NewRequest("GET", "http://example.com/svg/camo-project/counter/views.svg?page_id=github.com/my-user/my-repo", nil)
+	req.Header.Set("User-Agent", "github-camo (xyz)")
+	req.RemoteAddr = "120.24.1.1:1234"
+
+	err := analyticsSvc.TrackBadgeOrCounter(ctx, req, subProjID)
+	if err != nil {
+		t.Fatalf("TrackBadgeOrCounter failed: %v", err)
+	}
+
+	stats, err := analyticsSvc.GetTodayStats(ctx, subProjID)
+	if err != nil {
+		t.Fatalf("GetTodayStats failed: %v", err)
+	}
+	if stats.PV != 1 {
+		t.Errorf("expected pv = 1, got %d", stats.PV)
+	}
+
+	streamItems, err := analyticsSvc.GetVisitStream(ctx, subProjID, 1)
+	if err != nil {
+		t.Fatalf("GetVisitStream failed: %v", err)
+	}
+	if len(streamItems) != 1 {
+		t.Fatalf("expected 1 stream item, got %d", len(streamItems))
+	}
+	if streamItems[0].SourceURL != "https://github.com/my-user/my-repo" {
+		t.Errorf("expected SourceURL to be https://github.com/my-user/my-repo, got %q", streamItems[0].SourceURL)
 	}
 }

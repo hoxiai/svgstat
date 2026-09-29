@@ -161,6 +161,7 @@ export function createInitialState() {
         loadingOverview: false,
         overviewRequestId: 0,
         visitStream: [],
+        lastLoadedVisitStreamProjectId: '',
         loadingVisitStream: false,
         visitStreamRequestId: 0,
         visitorViewMode: 'stream',
