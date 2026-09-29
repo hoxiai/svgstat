@@ -384,7 +384,19 @@ export const translations = {
 		cat_direct: 'Direct Visit',
 		cat_social: 'Social Media',
 		cat_ai: 'AI Assistant',
-		cat_other: 'Other'
+		cat_other: 'Other',
+		viewRealtimeStream: '⚡ Realtime Stream',
+		viewIPVisitors: '👥 Today\'s IP List',
+		filterAll: 'All',
+		filterHuman: '👤 Human Visitors',
+		filterAI: '🤖 AI Agents',
+		ipAddress: 'IP Address',
+		pvHits: 'PV Hits',
+		recentPage: 'Recent Page',
+		aiAgentBadge: 'AI Agent',
+		aiVisitsCount: 'AI Visits',
+		noIPVisitors: 'No IP visitor records for today.',
+		prevPage: 'Previous'
     },
     zh: {
         dashboard: '控制台',
@@ -771,7 +783,19 @@ export const translations = {
 		cat_direct: '直接访问',
 		cat_social: '社交媒体',
 		cat_ai: 'AI 助理',
-		cat_other: '其他来源'
+		cat_other: '其他来源',
+		viewRealtimeStream: '⚡ 实时访问流水',
+		viewIPVisitors: '👥 今日 IP 列表',
+		filterAll: '全部',
+		filterHuman: '👤 人类访客',
+		filterAI: '🤖 AI 智能体',
+		ipAddress: 'IP 地址',
+		pvHits: '浏览量 (PV)',
+		recentPage: '最近受访页面',
+		aiAgentBadge: 'AI 智能体',
+		aiVisitsCount: 'AI 访问次数',
+		noIPVisitors: '今日暂无 IP 访问记录。',
+		prevPage: '上一页'
     }
 };
 

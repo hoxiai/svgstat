@@ -163,6 +163,8 @@ export function createInitialState() {
         visitStream: [],
         loadingVisitStream: false,
         visitStreamRequestId: 0,
+        visitorViewMode: 'stream',
+        streamFilter: 'all',
         hourlyMetric: 'pv',
         autoRefreshStream: true,
         streamInterval: null,
@@ -210,6 +212,7 @@ export function createInitialState() {
         trendRequestId: 0,
         trendRequestKey: '',
         loadingVisitors: false,
+        loadingVisitorsPage: false,
         freePageId: '',
         toast: { show: false, message: '', type: 'success', timer: null },
         codeSettings: {

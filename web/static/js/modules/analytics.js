@@ -116,7 +116,7 @@ export function createAnalyticsMethods() {
             this.stopVisitStreamPolling();
             if (!this.autoRefreshStream) return;
             this.streamInterval = setInterval(() => {
-                if (this.currentPage === 'project-detail' && this.selectedProject?.id === projectId && this.projectTab === 'visitors' && this.autoRefreshStream) {
+                if (this.currentPage === 'project-detail' && this.selectedProject?.id === projectId && this.projectTab === 'visitors' && this.visitorViewMode === 'stream' && this.autoRefreshStream) {
                     this.loadVisitStream(projectId, true);
                 }
             }, 5000);
@@ -132,13 +132,40 @@ export function createAnalyticsMethods() {
         toggleAutoRefreshStream() {
             this.autoRefreshStream = !this.autoRefreshStream;
             if (this.selectedProject) {
-                if (this.autoRefreshStream && this.projectTab === 'visitors') {
+                if (this.autoRefreshStream && this.projectTab === 'visitors' && this.visitorViewMode === 'stream') {
                     this.loadVisitStream(this.selectedProject.id);
                     this.startVisitStreamPolling(this.selectedProject.id);
                 } else {
                     this.stopVisitStreamPolling();
                 }
             }
+        },
+
+        switchVisitorViewMode(mode) {
+            this.visitorViewMode = mode;
+            if (!this.selectedProject) return;
+            if (mode === 'ip') {
+                this.stopVisitStreamPolling();
+                this.loadVisitors(this.selectedProject.id);
+            } else if (mode === 'stream') {
+                if (!this.visitStream || this.visitStream.length === 0) {
+                    this.loadVisitStream(this.selectedProject.id);
+                }
+                if (this.autoRefreshStream) {
+                    this.startVisitStreamPolling(this.selectedProject.id);
+                }
+            }
+        },
+
+        getFilteredVisitStream() {
+            if (!this.visitStream || !Array.isArray(this.visitStream)) return [];
+            if (this.streamFilter === 'ai') {
+                return this.visitStream.filter(item => Boolean(item.isAiAgent));
+            }
+            if (this.streamFilter === 'human') {
+                return this.visitStream.filter(item => !item.isAiAgent);
+            }
+            return this.visitStream;
         },
 
         async loadAnalysis(projectId, force = false, isSilent = false) {
@@ -337,7 +364,7 @@ export function createAnalyticsMethods() {
                 } else {
                     this.stopDiagnosticsPolling();
                 }
-                if (targetTab === 'visitors' && this.autoRefreshStream) {
+                if (targetTab === 'visitors' && this.visitorViewMode === 'stream' && this.autoRefreshStream) {
                     this.startVisitStreamPolling(this.selectedProject.id);
                 } else {
                     this.stopVisitStreamPolling();
@@ -363,9 +390,13 @@ export function createAnalyticsMethods() {
                 this.loadSessionQuality(projectId, isRefresh);
                 this.loadConversions(projectId);
             } else if (tab === 'visitors') {
-                this.loadVisitStream(projectId);
-                if (this.autoRefreshStream) {
-                    this.startVisitStreamPolling(projectId);
+                if (this.visitorViewMode === 'ip') {
+                    this.loadVisitors(projectId, 1, isRefresh);
+                } else {
+                    this.loadVisitStream(projectId);
+                    if (this.autoRefreshStream) {
+                        this.startVisitStreamPolling(projectId);
+                    }
                 }
             } else if (tab === 'diagnostics') {
                 this.loadDiagnostics(projectId);
@@ -394,13 +425,17 @@ export function createAnalyticsMethods() {
                 } else if (this.projectTab === 'diagnostics') {
                     this.loadDiagnostics(projectId);
                 } else if (this.projectTab === 'visitors') {
-                    this.loadVisitStream(projectId, true);
+                    if (this.visitorViewMode === 'ip') {
+                        this.loadVisitors(projectId, this.visitorsPage?.page || 1, true);
+                    } else {
+                        this.loadVisitStream(projectId, true);
+                    }
                 }
             }, 30000);
             if (this.projectTab === 'diagnostics') {
                 this.startDiagnosticsPolling(projectId);
             }
-            if (this.projectTab === 'visitors' && this.autoRefreshStream) {
+            if (this.projectTab === 'visitors' && this.visitorViewMode === 'stream' && this.autoRefreshStream) {
                 this.startVisitStreamPolling(projectId);
             }
         },
@@ -433,22 +468,25 @@ export function createAnalyticsMethods() {
             this.expandedVisitorId = this.expandedVisitorId === visitorId ? null : visitorId;
         },
 
-        async loadVisitors(projectId, page = 1) {
+        async loadVisitors(projectId, page = 1, force = false) {
             if (!projectId) return;
 
-            const pageSize = this.visitorFilters.pageSize || 20;
-            const queryString = this.getVisitorQueryString(page);
+            const pageSize = this.visitorFilters?.pageSize || 20;
+            const queryString = this.getVisitorQueryString ? this.getVisitorQueryString(page) : `page=${page}&page_size=${pageSize}`;
             const fullRequestKey = `${projectId}:${queryString}`;
-            if (this.lastLoadedVisitorsRequestKey === fullRequestKey) return;
+            if (!force && this.lastLoadedVisitorsRequestKey === fullRequestKey) return;
 
             this.lastLoadedVisitorsRequestKey = fullRequestKey;
             this.loadingVisitors = true;
+            this.loadingVisitorsPage = true;
             this.expandedVisitorId = null;
-            this.visitorsPage = {
-                ...createEmptyVisitorPage(),
-                page,
-                pageSize
-            };
+            if (!this.visitorsPage || !this.visitorsPage.items || this.visitorsPage.items.length === 0) {
+                this.visitorsPage = {
+                    ...createEmptyVisitorPage(),
+                    page,
+                    pageSize
+                };
+            }
 
             try {
                 const res = await fetch(`/api/v1/projects/${projectId}/visitors?${queryString}`, { credentials: 'same-origin' });
@@ -464,6 +502,7 @@ export function createAnalyticsMethods() {
                 console.error('Failed to load visitors', e);
             } finally {
                 this.loadingVisitors = false;
+                this.loadingVisitorsPage = false;
             }
         },
 
