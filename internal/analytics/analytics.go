@@ -104,6 +104,7 @@ type DailyStats struct {
 	Hourly                 map[string]map[string]int64                `json:"hourly"`
 	Requests               int64                                      `json:"requests"`
 	Bots                   int64                                      `json:"bots"`
+	AIVisits               int64                                      `json:"aiVisits"`
 	Referrers              map[string]int64                           `json:"referrers"`
 	Countries              map[string]int64                           `json:"countries"`
 	Regions                map[string]int64                           `json:"regions"`
@@ -850,6 +851,7 @@ func (a *Analytics) GetStats(ctx context.Context, projectID, date string) (*Dail
 	pvKey := cache.BuildKey("project", projectID, "pv", date)
 	requestsKey := cache.BuildKey("project", projectID, "requests", date)
 	botsKey := cache.BuildKey("project", projectID, "bots", date)
+	aiVisitsKey := cache.BuildKey("project", projectID, "ai_visits", date)
 	uvSetKey := cache.BuildKey("project", projectID, "uvset", date)
 	ipSetKey := cache.BuildKey("project", projectID, "ipset", date)
 	hourlyPVKey := cache.BuildKey("project", projectID, "hourly", date, "pv")
@@ -886,6 +888,7 @@ func (a *Analytics) GetStats(ctx context.Context, projectID, date string) (*Dail
 	pvCmd := pipe.Get(ctx, pvKey)
 	requestsCmd := pipe.Get(ctx, requestsKey)
 	botsCmd := pipe.Get(ctx, botsKey)
+	aiVisitsCmd := pipe.Get(ctx, aiVisitsKey)
 	uvCmd := pipe.SCard(ctx, uvSetKey)
 	ipCmd := pipe.SCard(ctx, ipSetKey)
 	hourlyPVCmd := pipe.HGetAll(ctx, hourlyPVKey)
@@ -958,6 +961,7 @@ func (a *Analytics) GetStats(ctx context.Context, projectID, date string) (*Dail
 	stats.PV, _ = pvCmd.Int64()
 	stats.Requests, _ = requestsCmd.Int64()
 	stats.Bots, _ = botsCmd.Int64()
+	stats.AIVisits, _ = aiVisitsCmd.Int64()
 	stats.UV = uvCmd.Val()
 	stats.IP = ipCmd.Val()
 	stats.Sessions, _ = sessionsCmd.Int64()

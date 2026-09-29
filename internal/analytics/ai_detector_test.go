@@ -200,4 +200,14 @@ func TestVisitStream_AICrawlerTracked(t *testing.T) {
 	if val != "1" {
 		t.Errorf("expected ai_visits key to be '1', got %q", val)
 	}
+
+	// Verify GetTodayStats includes AIVisits
+	todayStats, err := a.GetTodayStats(ctx, projectID)
+	if err != nil {
+		t.Fatalf("GetTodayStats failed: %v", err)
+	}
+	if todayStats.AIVisits != 1 {
+		t.Errorf("expected todayStats.AIVisits=1, got %d", todayStats.AIVisits)
+	}
 }
+

@@ -18,6 +18,7 @@ type TodayOverview struct {
 	PV                  int64                  `json:"pv"`
 	UV                  int64                  `json:"uv"`
 	IP                  int64                  `json:"ip"`
+	TodayAI             int64                  `json:"todayAi"`
 	AvgPageviewsPerUser float64                `json:"avgPageviewsPerUser"`
 	YesterdayFull       PeriodTotals           `json:"yesterdayFull"`
 	YesterdaySamePeriod PeriodTotals           `json:"yesterdaySamePeriod"`
@@ -147,6 +148,7 @@ func (s *Service) GetTodayOverview(ctx context.Context, projectID string, now ti
 		PV:                  todayStats.PV,
 		UV:                  todayStats.UV,
 		IP:                  todayStats.IP,
+		TodayAI:             todayStats.AIVisits,
 		AvgPageviewsPerUser: avgPageviews,
 		YesterdayFull:       yesterdayFull,
 		YesterdaySamePeriod: yesterdaySamePeriod,
