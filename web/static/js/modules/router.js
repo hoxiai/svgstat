@@ -70,6 +70,8 @@ export function createRouterMethods() {
                 this.diagnosticsPage = 1;
                 this.eventsPage = 1;
                 this.sessionSegmentsPage = 1;
+                this.pagesPage = 1;
+                this.pageSearchQuery = '';
 
                 const rawHash = window.location.hash.replace(/^#/, '');
                 const validTabs = ['overview', 'growth', 'quality', 'visitors', 'diagnostics'];

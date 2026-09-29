@@ -230,8 +230,9 @@ export function createFormatterMethods() {
 
         getPaginatedFilteredPages(pathsMap, searchQuery = '', page = 1, pageSize = 10) {
             const list = this.getFilteredPages(pathsMap, searchQuery);
-            const p = Math.max(1, Number(page ?? this?.pagesPage) || 1);
             const size = Math.max(1, Number(pageSize ?? this?.pagesPageSize) || 10);
+            const totalPages = Math.max(1, Math.ceil(list.length / size));
+            const p = Math.min(totalPages, Math.max(1, Number(page ?? this?.pagesPage) || 1));
             const start = (p - 1) * size;
             return list.slice(start, start + size);
         },
