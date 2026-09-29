@@ -496,6 +496,7 @@ func (a *Analytics) trackRequestData(ctx context.Context, data *RequestData, cou
 	channelKey := cache.BuildKey("project", projectID, "channel", date)
 	siteSearchKey := cache.BuildKey("project", projectID, "site_search", date)
 	visitorsKey := cache.BuildKey("project", projectID, "visitors_v2", date)
+	aiVisitsKey := cache.BuildKey("project", projectID, "ai_visits", date)
 	installationFirstKey := cache.BuildKey("project", projectID, "installation", "first_seen")
 	installationLastKey := cache.BuildKey("project", projectID, "installation", "last_seen")
 
@@ -504,7 +505,14 @@ func (a *Analytics) trackRequestData(ctx context.Context, data *RequestData, cou
 	}
 	pipe.SetNX(ctx, installationFirstKey, now, 0)
 	pipe.Set(ctx, installationLastKey, now, 0)
-	if data.IsBot {
+
+	isAI, _ := DetectAICrawler(data.UserAgent)
+	if isAI {
+		pipe.Incr(ctx, aiVisitsKey)
+		a.pushVisitStream(ctx, pipe, data, eventTime)
+	}
+
+	if data.IsBot || isAI {
 		pipe.Incr(ctx, botsKey)
 	} else if shouldCountPageview(data.IsBot, countPageview) {
 		a.pushVisitStream(ctx, pipe, data, eventTime)
@@ -602,7 +610,7 @@ func (a *Analytics) trackRequestData(ctx context.Context, data *RequestData, cou
 		pvKey, requestsKey, botsKey, uvSetKey, referrerKey, countryKey,
 		regionKey, cityKey, deviceKey, browserKey, pathKey, ipKey, sourceKey,
 		mediumKey, campaignKey, termKey, channelKey, siteSearchKey, visitorsKey,
-		ipSetKey, hourlyPVKey, hourlyUVKey, hourlyIPKey,
+		ipSetKey, hourlyPVKey, hourlyUVKey, hourlyIPKey, aiVisitsKey,
 	} {
 		pipe.Expire(ctx, key, a.keyTTL)
 	}

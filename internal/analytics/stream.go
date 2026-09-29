@@ -36,6 +36,8 @@ type VisitStreamItem struct {
 	Path           string `json:"path"`
 	DeviceType     string `json:"deviceType"`
 	Browser        string `json:"browser"`
+	IsAIAgent      bool   `json:"isAiAgent"`
+	AIName         string `json:"aiName,omitempty"`
 }
 
 func newStreamID() string {
@@ -137,7 +139,7 @@ func (a *Analytics) buildVisitStreamItem(data *RequestData, eventTime time.Time)
 	if rawIP == "" {
 		rawIP = data.IP
 	}
-	return VisitStreamItem{
+	item := VisitStreamItem{
 		ID:             newStreamID(),
 		Timestamp:      eventTime.Format(time.RFC3339),
 		TimeStr:        eventTime.Format("15:04:05"),
@@ -153,6 +155,15 @@ func (a *Analytics) buildVisitStreamItem(data *RequestData, eventTime time.Time)
 		DeviceType:     data.DeviceType,
 		Browser:        data.Browser,
 	}
+	if isAI, aiName := DetectAICrawler(data.UserAgent); isAI {
+		item.IsAIAgent = true
+		item.AIName = aiName
+		item.SourceCategory = "ai"
+		item.SourceName = aiName
+		item.DeviceType = "bot"
+		item.Browser = aiName
+	}
+	return item
 }
 
 func (a *Analytics) pushVisitStream(ctx context.Context, pipe redis.Pipeliner, data *RequestData, eventTime time.Time) error {
