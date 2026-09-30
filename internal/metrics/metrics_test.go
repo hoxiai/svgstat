@@ -86,9 +86,9 @@ func TestMaxDailyStatsMergesTodayWithoutDoubleCounting(t *testing.T) {
 }
 
 func TestTrimBreakdownsKeepsTopEntries(t *testing.T) {
-	breakdowns := map[string]map[string]int64{"paths": {"/a": 1, "/b": 3, "/c": 2}}
+	breakdowns := map[string]map[string]int64{"sources": {"/a": 1, "/b": 3, "/c": 2}}
 	trimBreakdowns(breakdowns, 2)
-	if len(breakdowns["paths"]) != 2 || breakdowns["paths"]["/b"] != 3 || breakdowns["paths"]["/c"] != 2 {
+	if len(breakdowns["sources"]) != 2 || breakdowns["sources"]["/b"] != 3 || breakdowns["sources"]["/c"] != 2 {
 		t.Fatalf("trimmed breakdowns = %#v", breakdowns)
 	}
 }
@@ -236,6 +236,21 @@ func TestTrimBreakdownsKeepsMoreChannels(t *testing.T) {
 	trimBreakdowns(breakdowns, 20)
 	if len(breakdowns["channels"]) != 30 {
 		t.Fatalf("channels kept %d entries, want all 30 (channel drill-down needs pairs beyond the top 20)", len(breakdowns["channels"]))
+	}
+}
+
+func TestTrimBreakdowns_PathsRetainsUpTo100(t *testing.T) {
+	breakdowns := map[string]map[string]int64{
+		"paths": make(map[string]int64),
+	}
+	for i := 0; i < 50; i++ {
+		breakdowns["paths"][fmt.Sprintf("/page-%d", i)] = int64(i + 1)
+	}
+
+	trimBreakdowns(breakdowns, 20)
+
+	if len(breakdowns["paths"]) != 50 {
+		t.Fatalf("expected 50 paths retained, got %d", len(breakdowns["paths"]))
 	}
 }
 

@@ -810,7 +810,7 @@ func percentageChange(current, previous int64) *float64 {
 
 // breakdownLimits overrides the default trim for breakdowns the dashboard
 // filters client-side: channels are medium/source pairs split by medium.
-var breakdownLimits = map[string]int{"channels": 100}
+var breakdownLimits = map[string]int{"channels": 100, "paths": 100}
 
 func trimBreakdowns(breakdowns map[string]map[string]int64, defaultLimit int) {
 	for name, values := range breakdowns {
