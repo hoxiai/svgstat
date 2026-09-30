@@ -2,7 +2,9 @@ package analytics
 
 import (
 	"context"
+	"encoding/json"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -143,3 +145,72 @@ func TestTrackRequestData_KeysHaveTTL(t *testing.T) {
 		}
 	}
 }
+
+func TestGetTodayVisitors_MaskedIPPreserved(t *testing.T) {
+	a, projectID := newTestAnalytics(t)
+	ctx := context.Background()
+
+	req := httptest.NewRequest("GET", "https://example.com/test", nil)
+	req.RemoteAddr = "114.240.12.34:1234"
+
+	if err := a.TrackPageview(ctx, req, projectID, "/test", "", "visitor-1", ""); err != nil {
+		t.Fatalf("TrackPageview error: %v", err)
+	}
+
+	visitors, err := a.GetTodayVisitors(ctx, projectID, VisitorQuery{Page: 1, PageSize: 10})
+	if err != nil {
+		t.Fatalf("GetTodayVisitors error: %v", err)
+	}
+	if len(visitors.Items) != 1 {
+		t.Fatalf("expected 1 visitor item, got %d", len(visitors.Items))
+	}
+	if visitors.Items[0].MaskedIP != "114.240.*.*" {
+		t.Errorf("expected MaskedIP '114.240.*.*', got %q", visitors.Items[0].MaskedIP)
+	}
+}
+
+func TestBuildVisitorDetail_MaskedIP(t *testing.T) {
+	// Case 1: masked_ip present in data
+	d1 := buildVisitorDetail("v1", map[string]string{
+		"masked_ip": "114.240.*.*",
+		"ip":        "anon_123456",
+	})
+	if d1.MaskedIP != "114.240.*.*" {
+		t.Errorf("expected MaskedIP '114.240.*.*', got %q", d1.MaskedIP)
+	}
+
+	// Case 2: masked_ip absent, raw IP present
+	d2 := buildVisitorDetail("v2", map[string]string{
+		"ip": "114.240.12.34",
+	})
+	if d2.MaskedIP != "114.240.*.*" {
+		t.Errorf("expected fallback MaskedIP '114.240.*.*', got %q", d2.MaskedIP)
+	}
+
+	// Case 3: masked_ip absent, anon IP present
+	d3 := buildVisitorDetail("v3", map[string]string{
+		"ip": "anon_abcdef123456",
+	})
+	if d3.MaskedIP != "" {
+		t.Errorf("expected empty MaskedIP for anon IP without masked_ip, got %q", d3.MaskedIP)
+	}
+
+	// Case 4: JSON marshaling with and without MaskedIP
+	b1, err := json.Marshal(d1)
+	if err != nil {
+		t.Fatalf("json.Marshal d1 failed: %v", err)
+	}
+	if !strings.Contains(string(b1), `"maskedIp":"114.240.*.*"`) {
+		t.Errorf("expected json to contain maskedIp, got: %s", string(b1))
+	}
+
+	b3, err := json.Marshal(d3)
+	if err != nil {
+		t.Fatalf("json.Marshal d3 failed: %v", err)
+	}
+	if strings.Contains(string(b3), `"maskedIp"`) {
+		t.Errorf("expected json to omit maskedIp when empty, got: %s", string(b3))
+	}
+}
+
+

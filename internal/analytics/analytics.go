@@ -160,6 +160,7 @@ type EventData struct {
 type VisitorDetail struct {
 	VisitorID   string `json:"visitorId"`
 	IP          string `json:"ip"`
+	MaskedIP    string `json:"maskedIp,omitempty"`
 	Path        string `json:"path"`
 	Referrer    string `json:"referrer"`
 	Country     string `json:"country"`
@@ -585,6 +586,7 @@ func (a *Analytics) trackRequestData(ctx context.Context, data *RequestData, cou
 			pipe.HSet(ctx, visitorKey, map[string]interface{}{
 				"last_seen_at": now,
 				"ip":           data.IP,
+				"masked_ip":    maskIP(data.RawIP),
 				"path":         data.Path,
 				"referrer":     data.Referrer,
 				"country":      data.Country,
@@ -1448,9 +1450,14 @@ func sortVisitorDetails(details []VisitorDetail, sortBy string) {
 }
 
 func buildVisitorDetail(visitorID string, data map[string]string) VisitorDetail {
+	maskedIP := data["masked_ip"]
+	if maskedIP == "" && data["ip"] != "" && !strings.HasPrefix(data["ip"], "anon_") {
+		maskedIP = maskIP(data["ip"])
+	}
 	detail := VisitorDetail{
 		VisitorID:   visitorID,
 		IP:          data["ip"],
+		MaskedIP:    maskedIP,
 		Path:        data["path"],
 		Referrer:    data["referrer"],
 		Country:     data["country"],
