@@ -188,13 +188,13 @@ export function createAnalyticsMethods() {
         },
 
         navigateToStreamVisitors() {
-            this.setProjectTab('visitors');
             this.switchVisitorViewMode('stream');
+            this.setProjectTab('visitors');
         },
 
         navigateToIpVisitors() {
-            this.setProjectTab('visitors');
             this.switchVisitorViewMode('ip');
+            this.setProjectTab('visitors');
         },
 
         navigateToQuality() {
