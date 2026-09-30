@@ -54,6 +54,7 @@ func TestDailyStatsArgs(t *testing.T) {
 		UV:        4,
 		Requests:  12,
 		Bots:      2,
+		AIVisits:  3,
 		Referrers: map[string]int64{"github.com": 7},
 		Countries: map[string]int64{"CN": 5, "US": 3},
 		Regions:   map[string]int64{"Zhejiang": 2},
@@ -73,8 +74,11 @@ func TestDailyStatsArgs(t *testing.T) {
 		t.Fatalf("dailyStatsArgs() error = %v", err)
 	}
 
-	if len(args) != 41 {
-		t.Fatalf("dailyStatsArgs() returned %d args, want 41", len(args))
+	if len(args) != 42 {
+		t.Fatalf("dailyStatsArgs() returned %d args, want 42", len(args))
+	}
+	if args[41] != int64(3) {
+		t.Errorf("args[41] (ai_visits) = %v, want 3", args[41])
 	}
 	if terms, ok := args[36].([]byte); !ok || string(terms) != `{"svg badge":2}` {
 		t.Errorf("args[36] (terms) = %v, want {\"svg badge\":2}", args[36])
@@ -175,8 +179,8 @@ func TestDailyStatsArgs_IncludesIPAndHourly(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	// Check that IP and Hourly are present and correctly serialized
-	if len(args) != 41 { // 39 prior columns + 2 new columns
-		t.Fatalf("expected 41 args, got %d", len(args))
+	if len(args) != 42 { // 39 prior columns + 2 columns (ip, hourly) + 1 ai_visits
+		t.Fatalf("expected 42 args, got %d", len(args))
 	}
 	if args[39] != int64(40) {
 		t.Errorf("expected arg[39] (ip) to be 40, got %v", args[39])
@@ -191,5 +195,23 @@ func TestDailyStatsArgs_IncludesIPAndHourly(t *testing.T) {
 	}
 	if hourly["pv"]["00"] != 10 || hourly["ip"]["01"] != 12 {
 		t.Errorf("hourly = %v, want matching values", hourly)
+	}
+}
+
+func TestDailyStatsArgs_IncludesAIVisits(t *testing.T) {
+	stats := &analytics.DailyStats{
+		ProjectID: "proj-1",
+		Date:      "2026-09-30",
+		AIVisits:  7,
+	}
+	args, err := dailyStatsArgs(stats)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(args) != 42 {
+		t.Fatalf("expected 42 args, got %d", len(args))
+	}
+	if args[41] != int64(7) {
+		t.Errorf("expected arg[41] (ai_visits) to be 7, got %v", args[41])
 	}
 }
