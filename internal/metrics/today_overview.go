@@ -103,13 +103,52 @@ func (s *Service) GetTodayOverview(ctx context.Context, projectID string, now ti
 		yesterdayHourly[key] = pt
 	}
 
+	var (
+		totalYesterdayHourlyUV int64
+		totalYesterdayHourlyIP int64
+		sumYesterdaySamePeriodUV int64
+		sumYesterdaySamePeriodIP int64
+	)
+	for h := 0; h < 24; h++ {
+		key := fmt.Sprintf("%02d", h)
+		pt := yesterdayHourly[key]
+		totalYesterdayHourlyUV += pt.UV
+		totalYesterdayHourlyIP += pt.IP
+		if h <= currentHour {
+			sumYesterdaySamePeriodUV += pt.UV
+			sumYesterdaySamePeriodIP += pt.IP
+		}
+	}
+
 	var yesterdaySamePeriod PeriodTotals
 	for h := 0; h <= currentHour; h++ {
 		key := fmt.Sprintf("%02d", h)
-		pt := yesterdayHourly[key]
-		yesterdaySamePeriod.PV += pt.PV
-		yesterdaySamePeriod.UV += pt.UV
-		yesterdaySamePeriod.IP += pt.IP
+		yesterdaySamePeriod.PV += yesterdayHourly[key].PV
+	}
+
+	if currentHour >= 23 {
+		yesterdaySamePeriod.UV = yesterdayFull.UV
+		yesterdaySamePeriod.IP = yesterdayFull.IP
+	} else {
+		if totalYesterdayHourlyUV > 0 && yesterdayFull.UV > 0 {
+			scaled := int64(float64(yesterdayFull.UV)*float64(sumYesterdaySamePeriodUV)/float64(totalYesterdayHourlyUV) + 0.5)
+			if scaled > yesterdayFull.UV {
+				scaled = yesterdayFull.UV
+			}
+			yesterdaySamePeriod.UV = scaled
+		} else {
+			yesterdaySamePeriod.UV = sumYesterdaySamePeriodUV
+		}
+
+		if totalYesterdayHourlyIP > 0 && yesterdayFull.IP > 0 {
+			scaled := int64(float64(yesterdayFull.IP)*float64(sumYesterdaySamePeriodIP)/float64(totalYesterdayHourlyIP) + 0.5)
+			if scaled > yesterdayFull.IP {
+				scaled = yesterdayFull.IP
+			}
+			yesterdaySamePeriod.IP = scaled
+		} else {
+			yesterdaySamePeriod.IP = sumYesterdaySamePeriodIP
+		}
 	}
 
 	todayHourly := make(map[string]HourlyPoint, currentHour+1)

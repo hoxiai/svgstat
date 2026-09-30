@@ -349,6 +349,14 @@ func TestGetTodayOverview_CalculatesHeroAndHourly(t *testing.T) {
 	// IP sum 00..14: 14 * 2 = 28 + 12 = 40
 	yesterdayHourlyIP["00"] = 12
 
+	// Customize exact totals for hours 15..23 to match full day totals (200 PV, 100 UV, 80 IP):
+	// PV sum 15..23: 8 * 10 = 80 + 20 = 100
+	yesterdayHourlyPV["23"] = 20
+	// UV sum 15..23: 8 * 5 = 40 + 10 = 50
+	yesterdayHourlyUV["23"] = 10
+	// IP sum 15..23: 8 * 4 = 32 + 8 = 40
+	yesterdayHourlyIP["23"] = 8
+
 	yesterdayHourlyJSON, err := json.Marshal(map[string]map[string]int64{
 		"pv": yesterdayHourlyPV,
 		"uv": yesterdayHourlyUV,
