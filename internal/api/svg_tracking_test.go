@@ -328,3 +328,36 @@ func TestSVGTracking_CamoProxyReferrerPreserved(t *testing.T) {
 		t.Errorf("expected SourceURL to be https://github.com/my-user/my-repo, got %q", streamItems[0].SourceURL)
 	}
 }
+
+func TestTrackBadgeOrCounter_SchemelessReferrerPath(t *testing.T) {
+	proj := &project.Project{
+		ID:            fmt.Sprintf("schemeless-ref-%d", time.Now().UnixNano()),
+		Slug:          "schemeless-ref-slug",
+		Status:        "active",
+		RenderEnabled: true,
+	}
+	_, analyticsSvc, projectID := newSVGTestAPIApp(t, proj)
+	ctx := context.Background()
+
+	req := httptest.NewRequest("GET", "http://example.com/svg/schemeless-ref-slug/counter/views.svg", nil)
+	req.Header.Set("Referer", "github.com") // scheme-less referrer
+	req.RemoteAddr = "120.24.1.1:1234"
+
+	if err := analyticsSvc.TrackBadgeOrCounter(ctx, req, projectID); err != nil {
+		t.Fatalf("TrackBadgeOrCounter failed: %v", err)
+	}
+
+	stats, err := analyticsSvc.GetTodayStats(ctx, projectID)
+	if err != nil {
+		t.Fatalf("GetTodayStats failed: %v", err)
+	}
+
+	// Should be recorded under "/" not "github.com"
+	if stats.Paths["github.com"] > 0 {
+		t.Errorf("path 'github.com' was recorded; expected root path '/'")
+	}
+	if stats.Paths["/"] != 1 {
+		t.Errorf("expected path '/' count = 1, got %v", stats.Paths)
+	}
+}
+

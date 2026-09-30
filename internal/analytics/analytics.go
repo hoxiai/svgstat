@@ -264,7 +264,11 @@ func (a *Analytics) TrackBadgeOrCounter(ctx context.Context, req *http.Request, 
 	}
 	path := ""
 	if referrer != "" {
-		if refURL, err := url.Parse(referrer); err == nil {
+		refToParse := strings.TrimSpace(referrer)
+		if !strings.Contains(refToParse, "://") {
+			refToParse = "https://" + refToParse
+		}
+		if refURL, err := url.Parse(refToParse); err == nil {
 			if refURL.Path != "" {
 				path = refURL.Path
 			} else if refURL.Hostname() != "" {
