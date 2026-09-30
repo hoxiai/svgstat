@@ -267,7 +267,11 @@ export function createFormatterMethods() {
             }
             const domains = this.selectedProject?.websiteDomains || [];
             if (domains.length > 0 && domains[0]) {
-                const domain = domains[0].includes('://') ? domains[0] : `https://${domains[0]}`;
+                let domain = domains[0].trim();
+                domain = domain.replace(/^\*\./, '');
+                if (!domain.includes('://')) {
+                    domain = `https://${domain}`;
+                }
                 const base = domain.replace(/\/+$/, '');
                 const cleanPath = path.startsWith('/') ? path : `/${path}`;
                 return `${base}${cleanPath}`;
