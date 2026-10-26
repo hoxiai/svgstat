@@ -170,8 +170,8 @@ export function createAnalyticsMethods() {
         },
 
         navigateToPagesBreakdown() {
-            if (this.projectTab !== 'overview') {
-                this.setProjectTab('overview');
+            if (this.projectTab !== 'pages') {
+                this.setProjectTab('pages');
             }
             this.setHourlyMetric('pv');
             const scroll = () => {
@@ -384,7 +384,7 @@ export function createAnalyticsMethods() {
 
         setProjectTab(tab) {
             if (!tab) return;
-            const validTabs = ['overview', 'growth', 'quality', 'visitors', 'diagnostics'];
+            const validTabs = ['overview', 'sources', 'pages', 'growth', 'quality', 'visitors', 'diagnostics'];
             const targetTab = validTabs.includes(tab) ? tab : 'overview';
             this.projectTab = targetTab;
             if (window.location.hash !== `#${targetTab}`) {
@@ -416,6 +416,8 @@ export function createAnalyticsMethods() {
                 this.loadTrend(projectId, isRefresh);
                 this.loadAnalysis(projectId, isRefresh);
                 this.loadIssues(projectId, isRefresh);
+            } else if (tab === 'sources' || tab === 'pages') {
+                this.loadAnalysis(projectId, isRefresh);
             } else if (tab === 'growth') {
                 this.loadConversions(projectId);
                 this.loadAnalysis(projectId, isRefresh);
@@ -449,6 +451,8 @@ export function createAnalyticsMethods() {
                     this.loadTrend(projectId, true, true);
                     this.loadAnalysis(projectId, true, true);
                     this.loadIssues(projectId, true);
+                } else if (this.projectTab === 'sources' || this.projectTab === 'pages') {
+                    this.loadAnalysis(projectId, true, true);
                 } else if (this.projectTab === 'growth') {
                     this.loadConversions(projectId);
                     this.loadAnalysis(projectId, true, true);

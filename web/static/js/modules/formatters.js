@@ -197,11 +197,15 @@ export function createFormatterMethods() {
             return Object.keys(items).length;
         },
 
-        getFilteredPages(pathsMap, searchQuery = '') {
+        getFilteredPages(pathsMap, searchQuery = '', pageviewTotal = null) {
             if (!pathsMap || typeof pathsMap !== 'object') return [];
             const query = String(searchQuery || '').trim().toLowerCase();
             const entries = Object.entries(pathsMap);
-            const totalCount = entries.reduce((sum, [, count]) => sum + (Number(count) || 0), 0);
+            const listedPageviews = entries.reduce((sum, [, count]) => sum + (Number(count) || 0), 0);
+            const reportedPageviews = Number(pageviewTotal ?? this.projectAnalysis?.current?.pv);
+            const totalCount = Number.isFinite(reportedPageviews)
+                ? Math.max(listedPageviews, reportedPageviews)
+                : listedPageviews;
 
             const filtered = query
                 ? entries.filter(([path]) => String(path).toLowerCase().includes(query))
@@ -222,6 +226,12 @@ export function createFormatterMethods() {
                     percentage
                 };
             });
+        },
+
+        getUnlistedPageviews(pathsMap, pageviewTotal = null) {
+            const listed = Object.values(pathsMap || {}).reduce((sum, count) => sum + (Number(count) || 0), 0);
+            const total = Number(pageviewTotal ?? this.projectAnalysis?.current?.pv);
+            return Number.isFinite(total) ? Math.max(0, total - listed) : 0;
         },
 
         filterPages(pathsMap, searchQuery = '') {

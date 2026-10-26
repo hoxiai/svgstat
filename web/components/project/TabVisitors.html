@@ -35,7 +35,7 @@
                         <span x-text="autoRefreshStream ? t('autoRefreshOn') : t('autoRefreshOff')"></span>
                     </span>
                 </div>
-                <p class="text-xs text-gray-500 mt-1.5" x-text="visitorViewMode === 'stream' ? t('realtimeStreamDesc') : (lang === 'zh' ? '今日按匿名 IP 聚合的独立访客列表与访问指标' : 'Today\'s unique visitors aggregated by anonymous IP and activity metrics')"></p>
+                <p class="text-xs text-gray-500 mt-1.5" x-text="visitorViewMode === 'stream' ? t('realtimeStreamDesc') : (lang === 'zh' ? '今日按匿名访客标识汇总；同一访客可能使用多个网络地址' : 'Today’s visitors grouped by anonymous browser/session identifiers; one visitor may use multiple IP addresses.')"></p>
             </div>
 
             <div class="flex items-center gap-2.5 shrink-0">

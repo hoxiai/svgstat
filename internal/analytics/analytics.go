@@ -256,35 +256,10 @@ func (a *Analytics) TrackPageview(ctx context.Context, req *http.Request, projec
 	return a.trackRequestData(ctx, data, false, true)
 }
 
-// TrackBadgeOrCounter records an SVG badge or counter request as a full pageview and request.
+// TrackBadgeOrCounter records an SVG badge or counter request without treating
+// the image fetch as a website pageview.
 func (a *Analytics) TrackBadgeOrCounter(ctx context.Context, req *http.Request, projectID string) error {
-	data := a.extractRequestData(req, projectID)
-	referrer := req.Referer()
-	if referrer == "" && data.Referrer != "" {
-		referrer = data.Referrer
-	}
-	path := ""
-	if referrer != "" {
-		refToParse := strings.TrimSpace(referrer)
-		if !strings.Contains(refToParse, "://") {
-			refToParse = "https://" + refToParse
-		}
-		if refURL, err := url.Parse(refToParse); err == nil {
-			if refURL.Path != "" {
-				path = refURL.Path
-			} else if refURL.Hostname() != "" {
-				path = "/"
-			}
-		}
-	}
-	if path == "" && req.URL != nil && req.URL.Path != "" {
-		path = req.URL.Path
-	}
-	if path == "" {
-		path = "/"
-	}
-	data.applyAttribution(websiteAttribution(path, referrer, originHost(req)))
-	return a.trackRequestData(ctx, data, true, true)
+	return a.TrackRequest(ctx, req, projectID)
 }
 
 func (data *RequestData) applyAttribution(attribution Attribution) {

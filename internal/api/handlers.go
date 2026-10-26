@@ -76,6 +76,8 @@ var spaTemplateFiles = []string{
 	"web/components/ProjectDetailModal.html",
 	"web/components/project/ProjectHeader.html",
 	"web/components/project/TabOverview.html",
+	"web/components/project/TabSources.html",
+	"web/components/project/TabPages.html",
 	"web/components/project/TabGrowth.html",
 	"web/components/project/TabQuality.html",
 	"web/components/project/TabVisitors.html",

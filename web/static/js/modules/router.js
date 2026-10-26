@@ -11,7 +11,7 @@ export function createRouterMethods() {
         handleHashChange() {
             if (this.currentPage !== 'project-detail' || !this.selectedProject) return;
             const rawHash = window.location.hash.replace(/^#/, '');
-            const validTabs = ['overview', 'growth', 'quality', 'visitors', 'diagnostics'];
+            const validTabs = ['overview', 'sources', 'pages', 'growth', 'quality', 'visitors', 'diagnostics'];
             const targetTab = validTabs.includes(rawHash) ? rawHash : 'overview';
             if (this.projectTab !== targetTab) {
                 this.setProjectTab(targetTab);
@@ -76,7 +76,7 @@ export function createRouterMethods() {
                 this.lastLoadedVisitStreamProjectId = '';
 
                 const rawHash = window.location.hash.replace(/^#/, '');
-                const validTabs = ['overview', 'growth', 'quality', 'visitors', 'diagnostics'];
+                const validTabs = ['overview', 'sources', 'pages', 'growth', 'quality', 'visitors', 'diagnostics'];
                 this.projectTab = validTabs.includes(rawHash) ? rawHash : 'overview';
 
                 if (this.projects.length > 0) {

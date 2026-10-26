@@ -22,6 +22,21 @@
     </div>
 </div>
 
+<div x-show="!['visitors', 'diagnostics'].includes(projectTab)" class="flex flex-wrap items-center justify-between gap-3">
+    <span class="text-xs font-medium text-gray-500" x-text="t('analyticsRange')"></span>
+    <div class="flex items-center gap-2" role="group" :aria-label="t('analyticsRange')">
+        <template x-for="days in [7, 30, 90]" :key="days">
+            <button
+                @click="setTrendDays(days)"
+                type="button"
+                class="rounded-lg border px-3 py-1.5 text-sm transition-colors"
+                :class="trendDays === days ? 'border-purple-600 bg-purple-600 text-white font-medium' : 'border-gray-200 bg-white text-gray-600 hover:border-purple-300 hover:text-purple-600'"
+                x-text="`${days}${t('daysShort')}`">
+            </button>
+        </template>
+    </div>
+</div>
+
 <!-- Compact Installation Warning (Shown only if not installed) -->
 <div x-show="installation.status !== 'installed'" class="rounded-xl border border-amber-200 bg-amber-50 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
     <div class="flex items-center gap-3">
@@ -44,6 +59,20 @@
         :class="projectTab === 'overview' ? 'bg-white text-purple-700 shadow-sm font-semibold' : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
         <span x-text="t('tabOverview')"></span>
+    </button>
+    <button
+        @click="setProjectTab('sources')"
+        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap"
+        :class="projectTab === 'sources' ? 'bg-white text-purple-700 shadow-sm font-semibold' : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3v18h18M7 14l4-4 4 4 6-7"/></svg>
+        <span x-text="t('tabSources')"></span>
+    </button>
+    <button
+        @click="setProjectTab('pages')"
+        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap"
+        :class="projectTab === 'pages' ? 'bg-white text-purple-700 shadow-sm font-semibold' : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h16v16H4zM8 8h8M8 12h8M8 16h5"/></svg>
+        <span x-text="t('tabPages')"></span>
     </button>
     <button
         @click="setProjectTab('growth')"
